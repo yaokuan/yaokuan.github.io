@@ -119,7 +119,7 @@ disqus_shortname: xxx
 
 ### Footer
 
-**欢迎使用这个主题，使用时请保留 footer 上的模板主题来源。** Theme designed by [HyG](https://github.com/gaohaoyang).
+**欢迎使用这个主题，使用时请保留 footer 上的模板主题来源。** Theme designed by [YaoKuan](https://github.com/yaokuan).
 ![footer](http://ww3.sinaimg.cn/large/7011d6cfjw1f3bepd8002j20hl02ct95.jpg)
 
 ### 统计
@@ -177,8 +177,8 @@ gem install jekyll
 
 ```yml
 # Site settings
-title: HyG
-brief-intro: Front-end Dev Engineer
+title: YaoKuan
+brief-intro: Road To Geek
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "http://gaohaoyang.github.io" # the base hostname & protocol for your site
 ```
