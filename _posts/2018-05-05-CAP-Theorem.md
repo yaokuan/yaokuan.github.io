@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      A brief introduction of CAP theorem 
+title:      CAPtheorem 
 discription: 本文通过一个具体的例子来解释什么是CAP。
 date:       2018-05-05 18:09:00
 categories: 高并发
@@ -13,6 +13,8 @@ tags:       CAP 高并发
 ### Introduction
 
 > AP is the theorem foundation of distribution system. It is impossible for a web service to provide the three following guarantees : Consistency, Availability and Partition-tolerance.
+
+
 
 
 #### Description
