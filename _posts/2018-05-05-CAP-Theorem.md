@@ -12,7 +12,7 @@ tags:       CAP 高并发
 
 ### Introduction
 
-> AP is the theorem foundation of distribution system. It is impossible for a web service to provide the three following guarantees : Consistency, Availability and Partition-tolerance.
+> CAP is the theorem foundation of distribution system. It is impossible for a web service to provide the three following guarantees : Consistency, Availability and Partition-tolerance.
 
 
 
