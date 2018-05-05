@@ -10,12 +10,7 @@ tags:       Leetcode 算法 DP问题
 * 文章目录
 {:toc}
 
-## Solution of Russian Doll Envelopes
-
 > [Russian Doll Envelopes](https://leetcode.com/problems/russian-doll-envelopes/) 来自Leetcode上一道经典的DP问题，在仔细研究这道题一整天后，决定写下这篇博文记录下整个思路。 首先看到这个问题第一反应就是DP问题，仔细读题后发现跟之前见过的求最长递增子序列有异曲同工之妙，所有先研究了一下最长递增子序列的求法
-
-
-
 
 
 
@@ -36,7 +31,8 @@ tags:       Leetcode 算法 DP问题
 |-|
 |||||||||
 
-```
+
+```java
  public static int subSequence(int[] inputArray){
      //endMaxArray记录以每一个元素结尾的最长子序列长度
      int[] endMaxArray = new int[inputArray.length];
@@ -123,7 +119,7 @@ tags:       Leetcode 算法 DP问题
 
 这样一轮遍历结束后，有效区的长度即为最长递增子序列的长度，查找算法使用二分查找，则时间复杂度可以到O(N*logN)，实际上由于有效区的长度不为N，时间复杂度比O(N*logN)略低
 
-```
+```java
 public static int subSequence(int[] arr){
    //endMaxArray记录以每一个元素结尾的最长子序列长度
    int[] l = new int[arr.length];
@@ -160,24 +156,22 @@ private static int findFirstLargerIndex(int[] arr, int high, int target){
 
 ### Russian Doll Envelopes
 
-> 原题如下：
+**原题如下：**
 
-You have a number of envelopes with widths and heights given as a pair of integers `(w, h)`. One envelope can fit into another if and only if both the width and height of one envelope is greater than the width and height of the other envelope.
-
-What is the maximum number of envelopes can you Russian doll? (put one inside other)
-
-**Example:**
+> You have a number of envelopes with widths and heights given as a pair of integers `(w, h)`. One envelope can fit into another if and only if both the width and height of one envelope is greater than the width and height of the other envelope.
+> What is the maximum number of envelopes can you Russian doll? (put one inside other)
+> <br><br>**Example:**
 Given envelopes = `[[5,4],[6,4],[6,7],[2,3]]`, the maximum number of envelopes you can Russian doll is 3 ([2,3] => [5,4] => [6,7]).
 
-> 那么现在回到Russian Doll Envelopes问题上来，此时的输入从一维到了二维，同时不要求按输入顺序，那么第一反应就是想到要先排序
+那么现在回到Russian Doll Envelopes问题上来，此时的输入从一维到了二维，同时不要求按输入顺序，那么第一反应就是想到要先排序
 
-1.按w升序，h升序排列
+1. 按w升序，h升序排列
 这是很容易想到的排序方法，按这种方法排序后，有一个问题，即：[5,4]和[4,6]的大小。我们无法判断这两个信封哪个更大，因为任何一个都装不下另外一个，那么按这种排序方法排序过后，后面的步骤就进行不下去了
 
-2.按w升序，h降序排列
+2. 按w升序，h降序排列
 在按w升序排列后，我们后面取到的信封在w这个维度上是递增的，后面信封的w肯定不会比前面的小，那么此时如果选择按h维度插入到前面第一个比此信封的h大的位置，那么必然可以保证此信封w和h要比前面的都大，也就是最长递增子序列的最大末尾，所以这里如果按w升序，h降序，则将二维问题转化为一维问题了，步骤同上（仅考虑h）
 
-```
+```java
 public static int maxEnvelopes(int[][] envelopes) {
     if (envelopes.length == 0){
         return 0;
