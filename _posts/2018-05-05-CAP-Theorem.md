@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      CAPtheorem 
+title:      A brief introduction to CAP 
 discription: 本文通过一个具体的例子来解释什么是CAP。
 date:       2018-05-05 18:09:00
 categories: 高并发
