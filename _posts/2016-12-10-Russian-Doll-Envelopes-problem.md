@@ -3,8 +3,8 @@ layout:     post
 title:      Solution of Russian Doll Envelopes
 discription: Leetcode Russian Doll Envelopes problem,it's all about how to think and solve it
 date:       2016-12-10 23:40:00
-catalog:    true
-tags:       [Java, Leetcode, 算法, DP问题, ]
+categories: java
+tags:       Java Leetcode 算法 DP问题
 ---
 
 ## Solution of Russian Doll Envelopes

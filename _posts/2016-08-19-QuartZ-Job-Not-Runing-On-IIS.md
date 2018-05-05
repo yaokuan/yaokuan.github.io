@@ -1,8 +1,8 @@
 ---
 layout:     post
 title:      Quartz Job在IIS下未自动运行
-catalog:    true
-tags:       [.NET, C#, QuartZ, 后端, IIS, ]
+categories: .net
+tags:       .NET C# QuartZ 后端 IIS 
 description: Quartz Job在IIS下未自动运行的解决方案
 ---
 

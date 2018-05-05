@@ -3,8 +3,8 @@ layout:     post
 title:      "Build Your First Jekyll Blog"
 subtitle:   "Build your blog with github pages and Jekyll"
 date:       2016-08-17 12:00:00
-catalog:    true
-tags:       [Window, 前端, Blog, Github, ]
+categories: jekyll
+tags:       Window 前端 Blog Github
 ---
 
 ## Build Your First Jekyll Blog
