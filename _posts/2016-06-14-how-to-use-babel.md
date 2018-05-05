@@ -1,6 +1,7 @@
 ---
 layout: post
 title:  "如何使用 babel"
+subtitle: "how to use babel"
 categories: JavaScript
 tags:  ES2015 ES6 ES5 babel 
 ---
