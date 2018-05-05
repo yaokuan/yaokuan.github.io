@@ -42,6 +42,7 @@ namenode在内存中保存文件系统中每个文件和每个数据块的引用
 - namenode之间通过高可用的共享存储实现编辑日志的共享
 - datanode需要同时向两个namenode发送数据块处理报告（因为数据块映射信息存储在namenode的内存中）
 - 客户端需要使用特定的机制来处理namenode时效的问题
+
 > 一个称为故障转移控制器（failover_controller）的系统管理着将活动namenode转移为备用namenode的过程
   
 ## 数据流
