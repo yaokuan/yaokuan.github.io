@@ -3,13 +3,19 @@ layout:     post
 title:      Nginx使用心得
 subtitle:   Nginx从零开始配置，反向代理原理及配置简介
 date:       2016-08-23 23:31:00
-catalog:    true
-tags:       [Nginx, 软件, 代理, ]
+categories: nginx
+tags:       Nginx 软件 代理
 ---
+
+* 文章目录
+{:toc}
 
 # Nginx使用心得
 
 > Nginx 最常的用途是提供反向代理服务，那么什么反向代理呢？
+
+
+
 
 ## 原理
 

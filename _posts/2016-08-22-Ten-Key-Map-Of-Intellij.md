@@ -3,13 +3,19 @@ layout:     post
 title:      （转）十大Intellij IDEA快捷键
 subtitle:   非常好用的快捷键，你需要更加熟悉
 date:       2016-08-23 01:09:00
-catalog:    true
-tags:       [转载, Intellij, ]
+categories: idea
+tags:       转载 intellij idea
 ---
+
+* 文章目录
+{:toc}
 
 # （转）十大Intellij IDEA快捷键
 
 > **Intellij IDEA**中有很多快捷键让人爱不释手，**stackoverflow**上也有一些有趣的讨论。每个人都有自己的最爱，想排出个理想的榜单还真是困难。以前也整理过**Intellij**的快捷键，这次就按照我日常开发时的使用频率，简单分类列一下我最喜欢的十大快捷-神-键吧。
+
+
+
 
 ##  智能提示
 

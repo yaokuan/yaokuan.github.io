@@ -3,9 +3,12 @@ layout:     post
 title:      MAC下安装CentOS虚拟机
 discription: 本文描述了如何在MAC通过VirtualBox安装多台CentOS虚拟机。
 date:       2018-04-13 18:05:00
-catalog:    true
-tags:       [MAC, 虚拟机, CentOS, VirtualBox, Hadoop, 大数据 ]
+categories: Hadoop
+tags:       MAC 虚拟机 CentOS Hadoop 大数据
 ---
+
+* 文章目录
+{:toc}
 
 # CentOS安装
 ## 首先下载所有需要的安装包

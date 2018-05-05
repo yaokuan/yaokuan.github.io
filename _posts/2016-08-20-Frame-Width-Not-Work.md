@@ -1,13 +1,19 @@
 ---
 layout: 	post
 title: 		非IE浏览器里对style.width赋值无效的问题
-catalog: 	true
-tags: 		[Window, 前端, JS, ]
+categories: 前端
+tags: 		Window 前端 JS
 description: 关于iframe高度的设置是由于设置页面使用XHTML DTD校验导致设置不带单位的width无效
 ---
 
+* 文章目录
+{:toc}
+
 ## 非IE浏览器里对style.width赋值无效的问题
 > 在做JSP页面调试div的高度的时候，在IE或IE内核浏览器里都已经测试通过没有任何问题，但是在**Chrome、Mozilla、Firefox、Netscape**里测试时问题就来了
+
+
+
 
 我的页面里用到了 **iframe**，这些 **iframe** 初始的 **style.height** 都是0，而在加载页面之后，iframe 就会自适应被加载的页面高度，我是通过 
 

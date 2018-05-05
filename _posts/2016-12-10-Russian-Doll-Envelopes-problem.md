@@ -3,13 +3,21 @@ layout:     post
 title:      Solution of Russian Doll Envelopes
 discription: Leetcode Russian Doll Envelopes problem,it's all about how to think and solve it
 date:       2016-12-10 23:40:00
-categories: java
-tags:       Java Leetcode 算法 DP问题
+categories: Java 算法
+tags:       Leetcode 算法 DP问题
 ---
+
+* 文章目录
+{:toc}
 
 ## Solution of Russian Doll Envelopes
 
 > [Russian Doll Envelopes](https://leetcode.com/problems/russian-doll-envelopes/) 来自Leetcode上一道经典的DP问题，在仔细研究这道题一整天后，决定写下这篇博文记录下整个思路。 首先看到这个问题第一反应就是DP问题，仔细读题后发现跟之前见过的求最长递增子序列有异曲同工之妙，所有先研究了一下最长递增子序列的求法
+
+
+
+
+
 
 ### 求最长递增子序列
 

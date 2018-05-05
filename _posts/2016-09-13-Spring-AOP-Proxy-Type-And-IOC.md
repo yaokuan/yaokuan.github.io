@@ -3,10 +3,12 @@ layout:     post
 title:      Spring两种代理方式初探
 discription: Spring有两种代理方式：CGLIB代理和JDK代理，两种方式各有区别，在实际应用中也需要注意区分。
 date:       2016-09-13 23:19:00
-catalog:    true
-tags:       [Spring, Java, AOP, 代理模式, ]
+categories: Spring 设计模式
+tags:       Spring AOP 设计模式
 ---
 
+* 文章目录
+{:toc}
 
 # Spring两种代理方式初探
 
@@ -17,6 +19,9 @@ tags:       [Spring, Java, AOP, 代理模式, ]
 - 代理模式分为静态代理、动态代理：
 - **静态代理**是由程序员创建或工具生成代理类的源码，再编译代理类。所谓静态也就是在程序运行前就已经存在代理类的字节码文件，代理类和委托类的关系在运行前就确定了。
 - **动态代理**是在实现阶段不用关心代理类，而在运行阶段才指定哪一个对象。
+
+
+
 
 ## JDK动态代理实例
    动态代理类克服了proxy需要继承专一的interface接口，并且要实现相应的method的缺陷。从JDK 1.3以来，Java 语言通过java.lang.reflex库提供的三个类直接支持代理：

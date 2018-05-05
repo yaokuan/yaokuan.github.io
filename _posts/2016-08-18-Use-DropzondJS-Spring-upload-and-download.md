@@ -6,6 +6,8 @@ categories: java
 tags:       Spring Upload DropzoneJS Java 后端
 ---
 
+* 文章目录
+{:toc}
 
 
 ## Easy File Upload Using DropzoneJS nd Spring
@@ -15,6 +17,9 @@ tags:       Spring Upload DropzoneJS Java 后端
 Saving user files in a web application is pretty much a necessity in many cases be it *images, videos, or documents.* This post will go over how to easily implement both the back and frontend components to facilitate the storage of files to a database. Additionally, we will be using **DropzoneJS** to prettify and make the front end uploading process more smooth. First we will lay down the backend framework to facilitate the persisting of user files to the database. We will start by going over the backend implementation by creating a basic REST server, using **Java Spring**, with endpoints to both accept and send files. This will then be followed up with a frontend implementation using html form and DropzoneJS as the library to upload files.
 
 You can follow along by downloading the complete source found on [GitHub](https://github.com/enyo/dropzone/tree/gh-pages).
+
+
+
 
 **It looks like this**
 

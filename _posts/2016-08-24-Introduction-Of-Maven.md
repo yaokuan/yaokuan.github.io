@@ -3,10 +3,12 @@ layout:     post
 title:      （译）Maven简介
 subtitle:   个人翻译的Maven官方介绍文档
 date:       2016-08-24 23:48:00
-catalog:    true
-tags:       [Maven, 译文, 官方文档, ]
+categories: Maven
+tags:       Maven 译文 官方文档
 ---
 
+* 文章目录
+{:toc}
 
 #Maven简介
 
@@ -21,6 +23,9 @@ Maven最初的目标是让开发者在最短的时间里理解开发过程中的
 - 提高大量的项目信息
 - 提供最好的开发指南
 - Allowing transparent migration to new features（这个怎么译？）
+
+
+
 
 ## 让构建过程更轻松
 虽然使用Maven并不代表你完全不需要去理解其实现的原理，但Maven确实提供了大量对于细节的包装

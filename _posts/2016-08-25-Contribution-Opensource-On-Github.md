@@ -3,8 +3,8 @@ layout:     post
 title:      Contributing to Open Source on GitHub
 discription: A great way to get involved in open source is to contribute to the existing projects you’re using. GitHub is home to more than 5 million open source projects. There are projects for every skill set like recipes, HTML/CSS, Ruby, Astrophysics and many more. This guide will cover what you might find in a typical project and how to make a great contribution.
 date:       2016-08-25 00:48:00
-catalog:    true
-tags:       [Github, 开源, 官方文档, ]
+categories: Github
+tags:       Github 开源 官方文档
 ---
 
 

@@ -3,9 +3,12 @@ layout:     post
 title:      Indroduction to ASP.NET Identity
 subtitle:   ASP.NET Identity was designed to solve site membership requirements.
 date:       2016-08-20 16:00:00
-catalog:    true
-tags:       [后端, .NET, Identity, C#, ]
+categories: .net
+tags:       后端 .NET Identity C#
 ---
+
+* 文章目录
+{:toc}
 
 ## Indroduction to ASP.NET Identity
 

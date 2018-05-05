@@ -3,9 +3,12 @@ layout:     post
 title:      Java线程同步的六种方式
 discription: 描述Java线程模型，什么是线程同步以及Java中线程同步的几种常用方式。
 date:       2016-12-09 18:04:00
-catalog:    true
-tags:       [Java, 多线程, volatile, synchronized, 线程同步, ]
+categories: Java
+tags:       Java 多线程 线程同步 高并发
 ---
+
+* 文章目录
+{:toc}
 
 # Java线程同步的六种方式
 
@@ -14,6 +17,9 @@ tags:       [Java, 多线程, volatile, synchronized, 线程同步, ]
 ![JMM](http://oc26wuqdw.bkt.clouddn.com/blog/threadsync/jmm.jpgjmm.jpg)
 
 > 所以在Java内存模型的规范下，单线程环境中，由于数据始终只有一个线程访问，所以不存在数据不同步的情况，但是在多线程的环境中，由于多线程工作内存数据会存在不同步的情况，会造成很多并发问题。
+
+
+
 
 首先我们举一个例子说明下多线程环境下没有使用线程同步会有什么影响
 
