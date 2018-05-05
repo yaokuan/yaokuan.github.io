@@ -2,7 +2,7 @@
 layout:		post
 title: 		Fiddler抓取HTTPS流量的原理
 catalog:	true
-categories: http
+categories: Http
 tags: 		Window Fiddler Https 前端
 ---
 

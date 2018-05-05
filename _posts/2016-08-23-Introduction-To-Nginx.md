@@ -3,7 +3,7 @@ layout:     post
 title:      Nginx使用心得
 subtitle:   Nginx从零开始配置，反向代理原理及配置简介
 date:       2016-08-23 23:31:00
-categories: nginx
+categories: Nginx
 tags:       Nginx 软件 代理
 ---
 

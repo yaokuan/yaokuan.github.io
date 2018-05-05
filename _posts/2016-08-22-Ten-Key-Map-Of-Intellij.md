@@ -3,7 +3,7 @@ layout:     post
 title:      （转）十大Intellij IDEA快捷键
 subtitle:   非常好用的快捷键，你需要更加熟悉
 date:       2016-08-23 01:09:00
-categories: idea
+categories: Idea
 tags:       转载 intellij idea
 ---
 
