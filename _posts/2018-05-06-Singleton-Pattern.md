@@ -17,7 +17,7 @@ tags:       设计模式 单例
 
 #### 懒汉式
 
-```
+```java
 public class LazySingleton {
     private LazySingleton singleton = null;
 
@@ -33,7 +33,7 @@ public class LazySingleton {
 
 ##### 1.方法加锁
 
-```
+```java
 public synchronized LazySingleton getSingleton() {
     if (singleton == null) {
         singleton = new LazySingleton();
@@ -44,7 +44,7 @@ public synchronized LazySingleton getSingleton() {
 
 ##### 2.双重锁定检查
 
-```
+```java
 public LazySingleton getSingleton() {
     if (singleton == null) {
         synchronized (LazySingleton.class) {
@@ -59,7 +59,7 @@ public LazySingleton getSingleton() {
 
 ##### 3.静态内部类
 
-```
+```java
 private static class LazyHolder {
     public static final LazySingleton SINGLETON = new LazySingleton();
 }
@@ -74,7 +74,7 @@ public LazySingleton getSingleton() {
 #### 饿汉式
 
 
-```
+```java
 public class StarveSingleton {
 
     private static StarveSingleton singleton = new StarveSingleton();
