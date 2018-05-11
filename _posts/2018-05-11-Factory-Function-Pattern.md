@@ -31,7 +31,7 @@ tags:       设计模式 工厂模式 工厂方法模式
 
 下面是主要代码：
 
-```
+```java
 public interface Shape {
     void draw();
 }
@@ -81,7 +81,7 @@ public class Factory {
 
 
 Shape、Circle、Rectangle、Square类的代码同上，不再赘述，下面看下工厂具体的代码：
-```
+```java
 public interface Factory {
     Shape produce();
 }
@@ -126,4 +126,6 @@ public class Test {
 
 可以看到工厂方法模式将工厂声明为一个接口，这样具体的实例化就交给了具体的子类，这样新增的产品就可以通过继承工厂接口来生成，一切看来似乎都很完美，但是……
 
-突然有一天，工厂对产品进行了升级，现在不仅有**Circle、Square、Rectangle**，还新增了**Triangle**和**Diamond**，同时每个形状都可以有**Red、Blue、Black、White、Green**五种颜色，那么我们需要**5x5=25**种不同的工厂，我的天!如果继续扩充呢...稍等...我们得另寻出路。下一篇我们将介绍：[抽象工厂模式](https://note.youdao.com/)
+突然有一天，工厂对产品进行了升级，现在不仅有**Circle、Square、Rectangle**，还新增了**Triangle**和**Diamond**，同时每个形状都可以有**Red、Blue、Black、White、Green**五种颜色，那么我们需要**5x5=25**种不同的工厂，我的天!如果继续扩充呢...稍等...我们得另寻出路。
+
+下一篇我们将介绍：[抽象工厂模式](https://note.youdao.com/)
