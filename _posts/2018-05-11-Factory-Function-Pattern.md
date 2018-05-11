@@ -3,7 +3,7 @@ layout:     post
 title:      工厂方法模式
 date:       2018-05-11 23:21:00
 categories: 设计模式
-tags:       设计模式 工厂模式 工厂方法模式
+tags:       设计模式 工厂模式
 ---
 
 * 文章目录
