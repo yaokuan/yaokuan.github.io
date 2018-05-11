@@ -128,4 +128,4 @@ public class Test {
 
 突然有一天，工厂对产品进行了升级，现在不仅有**Circle、Square、Rectangle**，还新增了**Triangle**和**Diamond**，同时每个形状都可以有**Red、Blue、Black、White、Green**五种颜色，那么我们需要**5x5=25**种不同的工厂，我的天!如果继续扩充呢...稍等...我们得另寻出路。
 
-下一篇我们将介绍：[抽象工厂模式](https://note.youdao.com/)
+下一篇我们将介绍：[抽象工厂模式](https://yaokuan.github.io/2018/05/11/Abstract-Factory-Pattern/)
