@@ -15,7 +15,7 @@ tags:       设计模式
 
 ### 设计模式的类型
 
-我们常说的==设计模式==是根据四人帮《设计模式》一书中提到的23种设计模式，这些模式可以分为三大类：**创建型模式（Creational Patterns）、结构型模式（Structural Patterns）、行为型模式（Behavioral Patterns）**
+我们常说的设计模式是根据四人帮《设计模式》一书中提到的23种设计模式，这些模式可以分为三大类：**创建型模式（Creational Patterns）、结构型模式（Structural Patterns）、行为型模式（Behavioral Patterns）**
 
 
 类型 | 模式
