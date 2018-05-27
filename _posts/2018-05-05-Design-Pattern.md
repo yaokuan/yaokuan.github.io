@@ -18,11 +18,40 @@ tags:       设计模式
 我们常说的设计模式是根据四人帮《设计模式》一书中提到的23种设计模式，这些模式可以分为三大类：**创建型模式（Creational Patterns）、结构型模式（Structural Patterns）、行为型模式（Behavioral Patterns）**
 
 
-类型 | 模式
----|---
-创建型模式 | [工厂方法模式（Factory Pattern）](https://yaokuan.github.io/2018/05/11/Factory-Function-Pattern/)<br>[抽象工厂模式（Abstract Factory Pattern）](https://yaokuan.github.io/2018/05/11/Abstract-Factory-Pattern/)<br>[单例模式（Singleton Pattern）](https://yaokuan.github.io/2018/05/06/Singleton-Pattern/)<br>[建造者模式（Builder Pattern）](https://yaokuan.github.io/2018/05/12/Builder-Design-Pattern/)<br>[原型模式（Prototype Pattern）](https://yaokuan.github.io/2018/05/13/Prototype-Design-Patern/)
-结构型模式 | 适配器模式（Adapter Pattern）<br>桥接模式（Bridge Pattern）<br>过滤器模式（Filter、Criteria Pattern）<br>组合模式（Composite Pattern）<br>[装饰器模式（Decorator Pattern）](https://yaokuan.github.io/2018/05/01/decorate-design-pattern/)<br>外观模式（Facade Pattern）<br>享元模式（Flyweight Pattern）<br>代理模式（Proxy Pattern）
-行为型模式 | 责任链模式（Chain of Responsibility Pattern）<br>命令模式（Command Pattern）<br>解释器模式（Interpreter Pattern）<br>迭代器模式（Iterator Pattern）<br>中介者模式（Mediator Pattern）<br>备忘录模式（Memento Pattern）<br>观察者模式（Observer Pattern）<br>状态模式（State Pattern）<br>空对象模式（Null Object Pattern）<br>策略模式（Strategy Pattern）<br>模板模式（Template Pattern）<br>访问者模式（Visitor Pattern）
+#### 创建型模式
+模式 | 学习难度 | 使用频率
+---|---|---
+[单例模式（Singleton Pattern）](https://yaokuan.github.io/2018/05/06/Singleton-Pattern/)|★☆☆☆☆|★★★★☆
+[工厂方法模式（Factory Pattern）](https://yaokuan.github.io/2018/05/11/Factory-Function-Pattern/)|★★☆☆☆|★★★★★
+[抽象工厂模式（Abstract Factory Pattern）](https://yaokuan.github.io/2018/05/11/Abstract-Factory-Pattern/)|★★★★☆|★★★★★
+[原型模式（Prototype Pattern）](https://yaokuan.github.io/2018/05/13/Prototype-Design-Patern/)|★★★☆☆|★★★☆☆
+[建造者模式（Builder Pattern）](https://yaokuan.github.io/2018/05/12/Builder-Design-Pattern/)|★★★★☆|★★☆☆☆
+
+#### 结构型模式 
+模式 | 学习难度 | 使用频率
+---|---|---
+[适配器模式（Adapter Pattern）](https://yaokuan.github.io/2018/05/25/Adapter-Design-Pattern/)|★★☆☆☆|★★★★☆
+[桥接模式（Bridge Pattern）](https://yaokuan.github.io/2018/05/26/Bridge-Design-Pattern/)|★★★☆☆|★★★☆☆
+组合模式（Composite Pattern）|★★★☆☆|★★★★☆
+[装饰器模式（Decorator Pattern）](https://yaokuan.github.io/2018/05/01/decorate-design-pattern/)|★★★☆☆|★★★☆☆
+[外观模式（Facade Pattern）](https://yaokuan.github.io/2018/05/27/Facade-Design-Pattern/)|★☆☆☆☆|★★★★★
+享元模式（Flyweight Pattern）|★★★★☆|★☆☆☆☆
+代理模式（Proxy Pattern）|★★★☆☆|★★★★☆
+
+#### 行为型模式
+模式 | 学习难度 | 使用频率
+---|---|---
+责任链模式（Chain of Responsibility Pattern）|★★★☆☆|★★☆☆☆
+命令模式（Command Pattern）|★★★☆☆|★★★★☆
+解释器模式（Interpreter Pattern）|★★★★★|★☆☆☆☆
+迭代器模式（Iterator Pattern）|★★★☆☆|★★★★★
+中介者模式（Mediator Pattern）|★★★☆☆|★★☆☆☆
+备忘录模式（Memento Pattern）|★★☆☆☆|★★☆☆☆
+观察者模式（Observer Pattern）|★★★☆☆|★★★★★
+状态模式（State Pattern）|★★★☆☆|★★★☆☆
+策略模式（Strategy Pattern）|★☆☆☆☆|★★★★☆
+模板模式（Template Pattern）|★★☆☆☆|★★★☆☆
+访问者模式（Visitor Pattern）|★★★★☆|★☆☆☆☆
 
 **附上模式关系图**
 
