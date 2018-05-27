@@ -26,7 +26,7 @@ tags:       Spring AOP 设计模式
 ## JDK动态代理实例
    动态代理类克服了proxy需要继承专一的interface接口，并且要实现相应的method的缺陷。从JDK 1.3以来，Java 语言通过java.lang.reflex库提供的三个类直接支持代理：
 
-```
+```java
  java.lang.reflect.Proxy
  java.lange.reflect.Method
  java.lang.reflect.InvocationHandler
@@ -35,7 +35,7 @@ tags:       Spring AOP 设计模式
 Proxy类在运行时动态创建代理对象，这也是dynamic proxy的由来，下面是类图，其中最重要的是newProxyInstance,这个方法中，指明了将要代理的类的加载器，业务类接口，以及代理类要执行动作的调用处理器（InvokeHandler)，其定义如下：
 
 
-```
+```java
 public static Object newProxyInstance(ClassLoader loader,Class<?>[] interfaces,
 	InvocationHandler h) throws IllegalArgumentException;
 ```
@@ -50,7 +50,7 @@ public static Object newProxyInstance(ClassLoader loader,Class<?>[] interfaces,
 当系统有了一个代理对象之后，对原方法的调用会首先被分派到一个调用处理器（Invocation Handler)。
 InvocationHandler 接口如下图所示：
 
-```
+```java
 Object invoke(Object proxy,Method method,Object[] args) throws Throwable;
 ```
 > Processes a method invocation on a proxy instance and returns the result. This method will be invoked on an invocation handler when a method is invoked on a proxy instance that it is associated with.
@@ -58,7 +58,7 @@ Object invoke(Object proxy,Method method,Object[] args) throws Throwable;
 实例：
 接口类：
 
-```
+```java
 package com.mahoutchina.pattern.proxy.dynamicproxy;
 
 public interface BookFacade {
@@ -69,7 +69,7 @@ public interface BookFacade {
 
 业务逻辑类：
 
-```
+```java
 package com.mahoutchina.pattern.proxy.dynamicproxy;
 
 public class BookFacadeImpl implements BookFacade {
@@ -86,7 +86,7 @@ public class BookFacadeImpl implements BookFacade {
 
 动态代理类：
 
-```
+```java
 package com.mahoutchina.pattern.proxy.dynamicproxy;
 
 import java.lang.reflect.InvocationHandler;
@@ -120,7 +120,7 @@ public class BookFacadeProxy implements InvocationHandler {
 
 测试类：
 
-```
+```java
 package com.mahoutchina.pattern.proxy.dynamicproxy;
 
 public class TestProxy {
@@ -140,7 +140,7 @@ JDK的动态代理机制只能代理实现了接口的类，而不能实现接�
 实例：
 业务类：
 
-```
+```java
 package net.battier.dao;
 
 public interface BookFacade {
@@ -148,7 +148,7 @@ public interface BookFacade {
 }
 ```
 
-```
+```java
 package net.battier.dao.impl;
 
 /**
@@ -163,7 +163,7 @@ public class BookFacadeImpl1 {
 
 代理类：
 
-```
+```java
 package net.battier.proxy;
 import java.lang.reflect.Method;
 import net.sf.cglib.proxy.Enhancer;
@@ -199,7 +199,7 @@ public class BookFacadeCglib implements MethodInterceptor {
 
 测试：
 
-```
+```java
 package net.battier.test;
 
 import net.battier.dao.impl.BookFacadeImpl1;
