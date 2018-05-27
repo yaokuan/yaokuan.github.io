@@ -19,6 +19,7 @@ tags:       设计模式
 
 
 #### 创建型模式
+
 模式 | 学习难度 | 使用频率
 ---|---|---
 [单例模式（Singleton Pattern）](https://yaokuan.github.io/2018/05/06/Singleton-Pattern/)|★☆☆☆☆|★★★★☆
@@ -28,6 +29,7 @@ tags:       设计模式
 [建造者模式（Builder Pattern）](https://yaokuan.github.io/2018/05/12/Builder-Design-Pattern/)|★★★★☆|★★☆☆☆
 
 #### 结构型模式 
+
 模式 | 学习难度 | 使用频率
 ---|---|---
 [适配器模式（Adapter Pattern）](https://yaokuan.github.io/2018/05/25/Adapter-Design-Pattern/)|★★☆☆☆|★★★★☆
@@ -39,6 +41,7 @@ tags:       设计模式
 代理模式（Proxy Pattern）|★★★☆☆|★★★★☆
 
 #### 行为型模式
+
 模式 | 学习难度 | 使用频率
 ---|---|---
 责任链模式（Chain of Responsibility Pattern）|★★★☆☆|★★☆☆☆
