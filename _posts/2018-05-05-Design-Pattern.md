@@ -37,7 +37,7 @@ tags:       设计模式
 [组合模式（Composite Pattern）](https://yaokuan.github.io/2018/06/02/Design-Pattern-Composite/)|★★★☆☆|★★★★☆
 [装饰器模式（Decorator Pattern）](https://yaokuan.github.io/2018/05/01/decorate-design-pattern/)|★★★☆☆|★★★☆☆
 [外观模式（Facade Pattern）](https://yaokuan.github.io/2018/05/27/Facade-Design-Pattern/)|★☆☆☆☆|★★★★★
-享元模式（Flyweight Pattern）|★★★★☆|★☆☆☆☆
+[享元模式（Flyweight Pattern）](https://yaokuan.github.io/2018/06/02/Flyweight-Design-Pattern/)|★★★★☆|★☆☆☆☆
 [代理模式（Proxy Pattern）](https://yaokuan.github.io/2018/06/02/Proxy-Design-Pattern/)|★★★☆☆|★★★★☆
 
 #### 行为型模式
