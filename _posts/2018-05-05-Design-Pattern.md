@@ -19,7 +19,6 @@ tags:       设计模式
 
 
 #### 创建型模式
-
 模式 | 学习难度 | 使用频率
 ---|---|---
 [单例模式（Singleton Pattern）](https://yaokuan.github.io/2018/05/06/Singleton-Pattern/)|★☆☆☆☆|★★★★☆
@@ -29,19 +28,17 @@ tags:       设计模式
 [建造者模式（Builder Pattern）](https://yaokuan.github.io/2018/05/12/Builder-Design-Pattern/)|★★★★☆|★★☆☆☆
 
 #### 结构型模式 
-
 模式 | 学习难度 | 使用频率
 ---|---|---
 [适配器模式（Adapter Pattern）](https://yaokuan.github.io/2018/05/25/Adapter-Design-Pattern/)|★★☆☆☆|★★★★☆
 [桥接模式（Bridge Pattern）](https://yaokuan.github.io/2018/05/26/Bridge-Design-Pattern/)|★★★☆☆|★★★☆☆
-组合模式（Composite Pattern）|★★★☆☆|★★★★☆
+[组合模式（Composite Pattern）](https://yaokuan.github.io/2018/06/02/Design-Pattern-Composite/)|★★★☆☆|★★★★☆
 [装饰器模式（Decorator Pattern）](https://yaokuan.github.io/2018/05/01/decorate-design-pattern/)|★★★☆☆|★★★☆☆
 [外观模式（Facade Pattern）](https://yaokuan.github.io/2018/05/27/Facade-Design-Pattern/)|★☆☆☆☆|★★★★★
 享元模式（Flyweight Pattern）|★★★★☆|★☆☆☆☆
-代理模式（Proxy Pattern）|★★★☆☆|★★★★☆
+[代理模式（Proxy Pattern）](https://yaokuan.github.io/2018/06/02/Proxy-Design-Pattern/)|★★★☆☆|★★★★☆
 
 #### 行为型模式
-
 模式 | 学习难度 | 使用频率
 ---|---|---
 责任链模式（Chain of Responsibility Pattern）|★★★☆☆|★★☆☆☆
