@@ -44,7 +44,7 @@ tags:       设计模式
 
 模式 | 学习难度 | 使用频率
 ---|---|---
-责任链模式（Chain of Responsibility Pattern）|★★★☆☆|★★☆☆☆
+[责任链模式（Chain of Responsibility Pattern）](https://yaokuan.github.io/2018/06/02/Chain-Design-Pattern/)|★★★☆☆|★★☆☆☆
 命令模式（Command Pattern）|★★★☆☆|★★★★☆
 解释器模式（Interpreter Pattern）|★★★★★|★☆☆☆☆
 迭代器模式（Iterator Pattern）|★★★☆☆|★★★★★
