@@ -52,8 +52,8 @@ tags:       设计模式
 备忘录模式（Memento Pattern）|★★☆☆☆|★★☆☆☆
 观察者模式（Observer Pattern）|★★★☆☆|★★★★★
 状态模式（State Pattern）|★★★☆☆|★★★☆☆
-策略模式（Strategy Pattern）|★☆☆☆☆|★★★★☆
-模板模式（Template Pattern）|★★☆☆☆|★★★☆☆
+[策略模式（Strategy Pattern）](https://yaokuan.github.io/2018/06/02/Strategy-Design-Pattern/)|★☆☆☆☆|★★★★☆
+[模板方法模式（Template Method Pattern）](https://yaokuan.github.io/2018/06/06/Template-Design-Pattern/)|★★☆☆☆|★★★☆☆
 访问者模式（Visitor Pattern）|★★★★☆|★☆☆☆☆
 
 **附上模式关系图**
