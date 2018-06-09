@@ -1,7 +1,7 @@
 ---
 layout:     post
 title:      设计模式简介
-date:       2018-05-05 20:48:00
+date:       2018-06-09 17:06:00
 categories: 设计模式
 tags:       设计模式
 ---
@@ -9,14 +9,15 @@ tags:       设计模式
 * 文章目录
 {:toc}
 
+# 设计模式系列正式宣告完结！喜大普奔！撒花~~
+
+
+
 > **设计模式（Design pattern）** 是一套被反复使用的、多数人知晓的、经过分类编目的、代码设计经验的总结。使用设计模式是为了重用代码、让代码更容易被他人理解、保证代码可靠性。
-
-
 
 ### 设计模式的类型
 
 我们常说的设计模式是根据四人帮《设计模式》一书中提到的23种设计模式，这些模式可以分为三大类：**创建型模式（Creational Patterns）、结构型模式（Structural Patterns）、行为型模式（Behavioral Patterns）**
-
 
 #### 创建型模式
 
@@ -45,16 +46,17 @@ tags:       设计模式
 模式 | 学习难度 | 使用频率
 ---|---|---
 [责任链模式（Chain of Responsibility Pattern）](https://yaokuan.github.io/2018/06/02/Chain-Design-Pattern/)|★★★☆☆|★★☆☆☆
-命令模式（Command Pattern）|★★★☆☆|★★★★☆
-解释器模式（Interpreter Pattern）|★★★★★|★☆☆☆☆
-迭代器模式（Iterator Pattern）|★★★☆☆|★★★★★
-中介者模式（Mediator Pattern）|★★★☆☆|★★☆☆☆
-备忘录模式（Memento Pattern）|★★☆☆☆|★★☆☆☆
-观察者模式（Observer Pattern）|★★★☆☆|★★★★★
-状态模式（State Pattern）|★★★☆☆|★★★☆☆
+[命令模式（Command Pattern）](https://yaokuan.github.io/2018/06/09/Command-Design-Pattern/)|★★★☆☆|★★★★☆
+[解释器模式（Interpreter Pattern）](https://yaokuan.github.io/2018/06/09/Intepreter-Design-Pattern/)|★★★★★|★☆☆☆☆
+[迭代器模式（Iterator Pattern）](https://yaokuan.github.io/2018/06/09/Iterator-Design-Pattern/)|★★★☆☆|★★★★★
+[中介者模式（Mediator Pattern）](https://yaokuan.github.io/2018/06/09/Mediator-Design_Pattern/)|★★★☆☆|★★☆☆☆
+[备忘录模式（Memento Pattern）](https://yaokuan.github.io/2018/06/09/Memento-Design-Pattern/)|★★☆☆☆|★★☆☆☆
+[观察者模式（Observer Pattern）](https://yaokuan.github.io/2018/06/09/Observer-Design-Pattern/)|★★★☆☆|★★★★★
+[状态模式（State Pattern）](https://yaokuan.github.io/2018/06/09/State-Design-Pattern/)|★★★☆☆|★★★☆☆
 [策略模式（Strategy Pattern）](https://yaokuan.github.io/2018/06/02/Strategy-Design-Pattern/)|★☆☆☆☆|★★★★☆
 [模板方法模式（Template Method Pattern）](https://yaokuan.github.io/2018/06/06/Template-Design-Pattern/)|★★☆☆☆|★★★☆☆
-访问者模式（Visitor Pattern）|★★★★☆|★☆☆☆☆
+[访问者模式（Visitor Pattern）](https://yaokuan.github.io/2018/06/09/Visitor-Design-Pattern/)|★★★★☆|★☆☆☆☆
+
 
 **附上模式关系图**
 
