@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      设计模式简介
+title:      浅谈23种设计模式
 date:       2018-06-09 17:06:00
 categories: 设计模式
 tags:       设计模式
