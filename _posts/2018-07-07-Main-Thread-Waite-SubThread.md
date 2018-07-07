@@ -9,7 +9,9 @@ tags:       Java 多线程 高并发
 * 文章目录
 {:toc}
 
-最近遇到多线程里面一个常见的问题：“如何让主线程在全部子线程执行完毕后再继续执行？”，然后就整理了几种常见的实现方式
+最近遇到多线程编程里面一个常见的问题：“如何让主线程在全部子线程执行完毕后再继续执行？”。经过一番查找和实践后就整理了几种常见的实现方式
+
+
 
 ## 方法一：主线程sleep
 主线程等待子线程执行完最简单的方式当然是在主线程中Sleep一段时间，这种方式最简单，我们先看下实现
@@ -188,5 +190,13 @@ tags:       Java 多线程 高并发
 - CountDownLatch一般用于某个线程A等待若干个其他线程执行完任务之后，它才执行，而CyclicBarrier一般用于一组线程互相等待至某个状态，然后这一组线程再同时执行；
 - CountDownLatch是不能够重用的，而CyclicBarrier是可以重用的(reset)。
 
+## 执行结果
+由于四种方式的执行结果大同小异，我们这里就放出两种同步和异步的执行结果
+
+#### 同步执行结果
+![image](http://oc26wuqdw.bkt.clouddn.com/2018/7/multipleThread/multiple-thread-sync.png)
+
+#### 异步执行结果
+![image](http://oc26wuqdw.bkt.clouddn.com/2018/7/multipleThread/multiple-thread-async.png)
 
 
