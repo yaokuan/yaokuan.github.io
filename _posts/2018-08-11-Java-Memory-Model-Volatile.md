@@ -271,3 +271,8 @@ StoreLoad Barriers 会使该屏障之前的所有内存访问指令(存储和装
 java -XX:+UnlockDiagnosticVMOptions -XX:+PrintAssembly [ClassName]
 ```
 
+## 参考文献
+- [深入理解Java内存模型（四）——volatile](http://www.infoq.com/cn/articles/java-memory-model-4)
+- [JSR 133 (Java Memory Model) FAQ](http://www.cs.umd.edu/users/pugh/java/memoryModel/jsr-133-faq.html)
+- [全面理解Java内存模型(JMM)及volatile关键字](https://blog.csdn.net/javazejian/article/details/72772461#%E7%90%86%E8%A7%A3java%E5%86%85%E5%AD%98%E5%8C%BA%E5%9F%9F%E4%B8%8Ejava%E5%86%85%E5%AD%98%E6%A8%A1%E5%9E%8B)
+- [由Java引起的指令重排序思考](https://blog.csdn.net/qq_32646795/article/details/78221064)
