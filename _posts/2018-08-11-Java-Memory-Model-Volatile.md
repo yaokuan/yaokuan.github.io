@@ -222,6 +222,7 @@ void read() {
 前文我们提到过重排序分为编译器重排序和处理器重排序。为了实现volatile内存语义，JMM会分别限制这两种类型的重排序类型。下面是JMM针对编译器制定的volatile重排序规则表：
 
 **是否能重排序**
+
 || 普通读/写 | volatile读 | volatile写
 ---|:---:|:---:|:---:
 普通读/写 | yes | yes | no
@@ -240,3 +241,33 @@ volatile写 | yes | no | no
 - 在每个volatile写操作的后面插入一个StoreLoad屏障。
 - 在每个volatile读操作的后面插入一个LoadLoad屏障。
 - 在每个volatile读操作的后面插入一个LoadStore屏障。
+
+### 内存屏障(Memory Barrier)
+#### CPU的角度
+其实这种问题不只是出现在Java上，毕竟一切的尽头都是机器指令，所以只要运行在计算机上都会有这种问题，所以其实指令集也针对乱序在多线程时出现的问题做出了拓展，这里我们以x86为例
+
+- sfence: 内存写屏障，保证这条指令前的所有的存储指令必须在这条指令之前执行，并且在执行此条指令时把写入到CPU的私有缓存的数据刷到公有内存(以下均简称主存)
+- lfence: 内存读屏障，保证这条指令后的所有读取指令在这条指令后执行，并且执行此条指令时，清空CPU的读取缓存，也就是说强制接下来的load从主存中取数据
+- mfence: full barrier，代价最大的barrier，有上述两种barrier的效果，当然也是最稳健的的barrier
+- lock: 这个是一种同步指令，也可以禁止lock前的指令和之后的指令重排序(有兴趣的同学可以去看一看这个指令，这个指令稍微复杂一些，可以实现的功能也很多，我就不贴了)，lock也许是很多JVM底层使用的指令
+上述只是x86指令集下的相关指令，不同的指令集可能barrier的效果并不一样，fence和lock是两种实现内存屏障的方式(毕竟一个指令集很庞大)
+
+#### Java的抽象
+Java这个时候又来了一波抽象，他把barrier分成了4种
+
+屏障类型 | 指令示例 | 解释
+---|---|---
+LoadLoadBarriers | Load1; LoadLoad;Load2 | 确保 Load1 数据的装载，之前于Load2 及所有后续装载指令的装载。
+StoreStoreBarriers | Store1; StoreStore;Store2 | 确保 Store1 数据对其他处理器可见(刷新到内存)，之前于Store2 及所有后续存储指令的存储。
+LoadStoreBarriers | Load1; LoadStore;Store2	Load1 | 数据装载，之前于Store2 及所有后续的存储指令刷新到内存。
+StoreLoadBarriers | Store1; StoreLoad;Load2 | 确保 Store1 数据对其他处理器变得可见(指刷新到内存)，之前于Load2 及所有后续装载指令的装载。
+
+StoreLoad Barriers 会使该屏障之前的所有内存访问指令(存储和装载指令)完成之后，才执行该屏障之后的内存访问指令。
+注意，这是Java内存模型里的内存屏障，只是Java的规范，对于不同的处理器/指令集，JVM有不同的实现方式。
+
+再次说明一下，这四个barrier是JVM内存模型的规范，而不是具体的字节码指令，因为你可以看到volatile变量在字节码中只是一个标志位，javap搞出来的字节码中并没有任何的barriers，只是说JVM执行引擎会在执行时会插一个对应的屏障，或者说在JIT/AOT生成机器指令的时候插一条对应逻辑的barriers，说句人话，这个barrier不是javac插的！所以你通过javap看不到，如果想要看到volatile的作用，可以把字节码转成汇编(很多很多)，具体指令如下
+
+```
+java -XX:+UnlockDiagnosticVMOptions -XX:+PrintAssembly [ClassName]
+```
+
