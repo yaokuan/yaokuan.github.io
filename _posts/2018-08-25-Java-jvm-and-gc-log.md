@@ -69,7 +69,7 @@ Exception in thread "main" java.lang.OutOfMemoryError: Java heap space
 
 #### StackOverFlowError
 
-```
+```java
 public class StackSOF {
     private int stackLength = 1;
 
