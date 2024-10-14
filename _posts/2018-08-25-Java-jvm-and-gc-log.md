@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      Java GC日志简析
+title:      123-Java GC日志简析
 date:       2018-08-25 22:24:00
 categories: JVM
 tags:       Java GC JVM
@@ -12,7 +12,7 @@ tags:       Java GC JVM
 
 
 
-## 123Java OOM
+## Java OOM
 ### Java堆溢出
 堆溢出最常见的就是在堆上分配内存而分配对象的内存又GC不掉（为何GC不掉，这部分后面会详细展开），导致新对象无法分配内存而发生OOM。为了演示方便，将Java堆的大小限制为20M且不可扩展，并在发生溢出时打印堆dump以便分析
 
