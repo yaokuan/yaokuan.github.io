@@ -23,4 +23,4 @@ tags:       Java GC JVM
 线上某个应用突然开始不停地有 java.lang.OutOfMemoryError: Metaspace 告警，看元空间占用内存一直在增长的，一般来说元空间的增长都是因为类加载导致的。继续看了下应用的 jvm.classloading.loaded.count 指标趋势图，基本一直在增长直到下一次服务发布或者是Full GC时才会降下来一些，如果应用间隔了一段时间没有发布就会频繁Full GC直到元空间OOM告警，为了搞清楚元空间OOM的根因，首先得了解下什么是元空间。
 
 ## 附上Java GC CheatSheet
-![image](http://oc26wuqdw.bkt.clouddn.com/2018/8/jvm/Java%207%20-%20GC%20cheatsheet.png)
+![image](../img/121.png)
