@@ -169,7 +169,7 @@ java.lang.reflect.Method#invoke方法是反射执行调用的关键，在图9标
 
 先看下新建流程里，会通过sun.reflect.ReflectionFactory#newMethodAccessor去创建methodAccessor对象，图11中有两个条件来控制使用哪种方式创建MethodAccessor对象
 
-noInflation。是否关闭inflation机制，默认情况下noInflation为false，若设置为true则始终使用字节码方式生成GMA（可通过JVM参数 -Dsun.reflect.noinflation来设置）。
+noInflation。是否关闭inflation机制[^1]，默认情况下noInflation为false，若设置为true则始终使用字节码方式生成GMA（可通过JVM参数 -Dsun.reflect.noinflation来设置）。
 
 !ReflectUtil.isVMAnonymousClass。这个条件是判断方法所属的类非匿名类，因为匿名类不支持字节码的方式，同样的判定条件在NativeMethodAccessorImpl也有原因详见注释（图12）。
 
@@ -618,7 +618,7 @@ http://openjdk.java.net/jeps/122
 
 ASM
 
-inflation机制：参考第3.2.1节
+[^1]: inflation机制：参考第3.2.1节
 
 GeneratedMethodAccessor：这个是字节码生成的方法描述类，源码中是找不到这个类的，标在这里是为了让大家知道除了native实现外还有一种GMA字节码的方式
 
