@@ -14,7 +14,7 @@ tags:       Java GC JVM
 
 
 
-![image](/img/121.png)
+
 
 
 【2023-12-22】深入反射解密JVM元空间OOM
@@ -31,6 +31,7 @@ tags:       Java GC JVM
 
 线上某个应用突然开始不停地有 java.lang.OutOfMemoryError: Metaspace 告警，看元空间占用内存一直在增长的，一般来说元空间的增长都是因为类加载导致的。继续看了下应用的 jvm.classloading.loaded.count 指标趋势图，基本一直在增长直到下一次服务发布或者是Full GC时才会降下来一些，如果应用间隔了一段时间没有发布就会频繁Full GC直到元空间OOM告警，为了搞清楚元空间OOM的根因，首先得了解下什么是元空间。
 
+![image](/img/20231222-1.png)
 图1 应用类加载数量趋势图
 
 2.2 元空间介绍
@@ -43,6 +44,7 @@ tags:       Java GC JVM
 
 存储内容不同。永久代存储类信息、字面量、类静态变量和符号引用，而元空间只存储类信息，实际上移除永久代的工作从JDK 7就开始了，符号引用转移到了Native heap，字面量和类静态变量转移到了Java heap。
 
+![image](/img/20231222-2.png)
 图2 元空间和永久代的区别
 
 那为什么JDK 8要新引入元空间来替换永久代？
@@ -101,7 +103,7 @@ cd /sun/reflectsun.reflect.GeneratedMethodAccessor*
 javap -verbose GeneratedMethodAccessor999
 
 查看反编译class文件找到反射执行的位置（在class文件中找到invokevirtual关键字，对应的路径则为反射生成GeneratedMethodAccessor的业务代码）进行分析发现大量调用来源于业务中bean的Getter/Setter方法，通过脚本统计反编译类的invokevirtual属性发现存在同一个Getter方法生成多个GeneratedMethodAccessor的情况。
-
+![image](/img/20231222-3.png)
 图3 反编译字节码类查看业务调用源头
 
 2.3.3 初步问题分析的结论引出重复类加载的疑点
