@@ -580,6 +580,7 @@ JDK 8的元空间的默认初始大小只有20.75MB（64位JVM），注意元空
 
 ## 6.2 相关优化参数
 |参数|说明|备注|
+| ----------- | ----------- | ----------- |
 |inflationThreshold参数|为避免反射膨胀可以适当调整|注意Oracle JVM和IBM JVM对于0的实现不同|
 |noInflation参数|反射字节码优化开关|默认值=false|
 |SoftRefLRUPolicyMSPerMB参数|软引用回收LRU策略关键参数|默认值=0|
