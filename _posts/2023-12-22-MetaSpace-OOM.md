@@ -19,22 +19,22 @@ tags:       Java GC JVM
 
 【2023-12-22】深入反射解密JVM元空间OOM
 
-1 背景
+# 1 背景
 
 标签：反射、类加载、JDK、元空间、OOM、软引用、并发线程安全
 
 笔者在生产实践中碰到过很多OOM相关的问题，其中因为元空间引发的OOM问题不在少数，大多数堆内存的问题结合JVM参数、GC日志、堆dump分析还是比较容易有清晰的方向的，而元空间的问题往往是比较难定位的。因此笔者借助一次元空间OOM的排查经历来详细了解下什么是元空间，为什么元空间会OOM以及如何避免。为了让读者能够快速有个大概的印象，先介绍下本文的写作思路，本文会从问题描述，介绍元空间，分析案例现象引出频繁类加载问题，在过程中会了解反射执行过程，初识GeneratedMethodAccessor类，分析GeneratedMethodAccessor类重复加载的原因，进行实验验证，JVM参数调优实践。这个过程中会涉及到反射调用的实现细节，膨胀（inflation）机制及其解决的问题，反射和软引用的关系，反射过程中的线程安全，JVM参数调优等知识点，本文主要围绕JDK 8来展开排查和调优过程，也会介绍JDK 7/11/17/21等版本的反射实现和调优思路。
 
-2 一个线上元空间OOM案例
+# 2 一个线上元空间OOM案例
 
-2.1 简述线上元空间OOM现象
+## 2.1 简述线上元空间OOM现象
 
 线上某个应用突然开始不停地有 java.lang.OutOfMemoryError: Metaspace 告警，看元空间占用内存一直在增长的，一般来说元空间的增长都是因为类加载导致的。继续看了下应用的 jvm.classloading.loaded.count 指标趋势图，基本一直在增长直到下一次服务发布或者是Full GC时才会降下来一些，如果应用间隔了一段时间没有发布就会频繁Full GC直到元空间OOM告警，为了搞清楚元空间OOM的根因，首先得了解下什么是元空间。
 
 ![image](/img/20231222-1.jpg)
 图1 应用类加载数量趋势图
 
-2.2 元空间介绍
+## 2.2 元空间介绍
 
 元空间是JDK 8才出现的概念，在JDK 8之前叫做永久代，它们都属于方法区，元空间、永久代、方法区看似同一个东西实际又有所区别。方法区是Java虚拟机的一个规范，所有虚拟机的实现都必须遵循规范，常见的虚拟机如HotSpot、JRockit（Oracle）、J9（IBM）都有对方法区不同的实现。我们通常使用的JDK都是由Sun JDK和OpenJDK所提供的，这也是应用最广泛的版本，而该版本使用的VM就是HotSpot VM，所以我们一般讨论就限定在HotSpot VM的范围。而元空间和永久代是HotSpot VM对方法区不同的具体实现，其区别包括：
 
@@ -57,7 +57,7 @@ tags:       Java GC JVM
 
 JDK 8实际上是HotSpot与JRockit合并的，只是产品名字还是叫HotSpot VM，合并就需要移除HotSpot特有的永久代，新引入元空间给新的HotSpot VM。
 
-2.3 元空间OOM问题初次分析
+## 2.3 元空间OOM问题初次分析
 
 那我们知道元空间主要就是存储类信息，再结合从2.1节观察 jvm.classloading.loaded.count  指标的增长趋势，我们基本可以判断这次元空间OOM是因为有频繁的类加载行为，我们可以理解在应用启动时会有类加载，但为什么应用在运行时还会加载这么多类需要重点排查下，JVM可以打印类加载和卸载的日志，需要添加下面的参数
 
@@ -73,7 +73,7 @@ JDK 8实际上是HotSpot与JRockit合并的，只是产品名字还是叫HotSpot
 
 看类的命名能知道是JDK中自带的类，虽然在JDK源码中搜不到这个类（3.1.2小节会解释为什么搜不到），但通过sun.reflect这个包名我们也能大概猜到这是和反射相关的类，但不知道是哪里用到了反射，为了进一步分析就需要借助反编译工具
 
-2.3.1 通过反编译工具分析大量加载类的来源
+### 2.3.1 通过反编译工具分析大量加载类的来源
 
 前面加了类加载卸载日志应用重启后不到10分钟，加载sun.reflect.GeneratedMethodAccessor类似的类就多达1600+，这是比较快的增长速度
 
@@ -106,7 +106,7 @@ javap -verbose GeneratedMethodAccessor999
 ![image](/img/20231222-3.jpg)
 图3 反编译字节码类查看业务调用源头
 
-2.3.3 初步问题分析的结论引出重复类加载的疑点
+### 2.3.3 初步问题分析的结论引出重复类加载的疑点
 
 所以关于频繁的GeneratedMethodAccessor类加载我们初步得出下面几个结论：
 
@@ -116,11 +116,11 @@ javap -verbose GeneratedMethodAccessor999
 
 第2点结论比较反直觉，我们一般认为对于某个反射方法已经是非常明确的了，所生成的字节码类应该只有唯一的一个且是可以复用的，如果是这样的话因为业务类的数量是固定的，那么对应反射方法的动态类加载数量理论上也应该是固定的。但实际上反射相关的类是持续增长且有重复加载的现象，也正是因为重复加载才会出现类数量持续增加最终导致元空间OOM的情况。所以为什么会出现重复加载的情况应该是问题的关键，我们带着疑问继续往下看。
 
-3 初识反射相关类GeneratedMethodAccessor（GMA）
+# 3 初识反射相关类GeneratedMethodAccessor（GMA）
 
 注：以下内容提到的GMA为GeneratedMethodAccessor类的缩写
 
-3.1 了解反射执行过程及GMA类在反射中的作用
+## 3.1 了解反射执行过程及GMA类在反射中的作用
 
 首先我们需要了解反射调用执行大概的过程，先看一个简单的反射例子，下面是通过反射调用拿到了person的id，首先要通过Person类获取对应的getId方法，然后执行对应的反射方法method.invoke()。
 
@@ -132,7 +132,7 @@ javap -verbose GeneratedMethodAccessor999
 ![image](/img/20231222-5.jpg)
 图5 反射调用执行时序图
 
-3.1.1 通过Class如何获取反射方法
+### 3.1.1 通过Class如何获取反射方法
 
 我们先来看下是怎么找到方法的，顺着java.lang.Class#getMethod往下会发现查找方法都会走到java.lang.Class#privateGetDeclaredMethods内部，publicOnly参数是用来控制是否只返回声明为public的方法，这里以图4为例publicOnly参数为true，对应返回declaredPublicMethods，方法内会首先判断ReflectionData是否为空，这是一个Class内部的软引用相当于本地缓存的作用，图6标红第3处会判断缓存内部的declaredPublicMethods是否为空，如果缓存内非空优先返回缓存内的，否则调用JNI获取类声明的public方法并放入缓存中。
 
@@ -155,9 +155,9 @@ javap -verbose GeneratedMethodAccessor999
 
 至此我们就通过Class获取到了对应的方法Method对象，这个Method对象是对原对象的一个深拷贝，之后就要进行反射调用了。
 
-3.1.2 Method执行反射调用的过程分析
+### 3.1.2 Method执行反射调用的过程分析
 
-3.1.2.1 获取MethodAccessor流程分析
+#### 3.1.2.1 获取MethodAccessor流程分析
 
 java.lang.reflect.Method#invoke方法是反射执行调用的关键，在图9标红1可以看到invoke()内部声明了一个局部变量ma它是MethodAccessor接口的一个实例化对象，而MethodAccessor接口定义了反射具体行为，Method.invoke的真正逻辑在图9标红3处的ma.invoke(obj, args)中，因为实际执行逻辑是委托给MethodAccessor进行的，所以这里我们首先要搞清楚MethodAccessor是如何生成的以及如何利用MethodAccessor来执行反射调用。
 
@@ -182,7 +182,7 @@ noInflation。是否关闭inflation机制，默认情况下noInflation为false�
 ![image](/img/20231222-12.jpg)
 图12
 
-3.1.2.2 关于MethodAccessor接口和它的实现类
+#### 3.1.2.2 关于MethodAccessor接口和它的实现类
 
 MethodAccessor接口定义了反射主要的行为，图11中可以看到 NativeMethodAccessorImpl（本地方法调用类）交给了DelegatingMethodAccessorImpl（代理类）代理执行，除这两种外还有 MethodAccessorImpl（抽象实现类）和GeneratedMethodAccessor（字节码类）。我们会发现在JDK源码中根本找不到GeneratedMethodAccessor这个类，是因为这是ASM字节码生成的类，看源码字节码生成方法返回的是MagicAccessorImpl，这是个什么类？
 
@@ -218,7 +218,7 @@ class MagicAccessorImpl {
 ![image](/img/20231222-15.jpg)
 图15 复制Method的流程
 
-3.1.2.3 分析MethodAccessor的执行过程
+#### 3.1.2.3 分析MethodAccessor的执行过程
 
 到这里我们就获取到MethodAccessor了，前面提到初次返回的是DelegatingMethodAccessorImpl的实例，它是对NativeMethodAccessorImpl实现类的代理，所以在method.invoke()内执行的反射调用最终是交给NativeMethodAccessorImpl执行，图16的标红的几点都比较重要，我们按标红序号展开来说一下。
 
@@ -232,7 +232,7 @@ class MagicAccessorImpl {
 ![image](/img/20231222-16.jpg)
 图16
 
-3.1.3 GeneratedMethodAccessor类的来源
+### 3.1.3 GeneratedMethodAccessor类的来源
 
 到这里反射执行的过程我们大概清楚了，从前面的分析流程中我们发现有两处是通过字节码生成MethodAccessor的（查看代码引用也只有这两处在使用MethodAccessorGenerator来生成MethodAccessor）
 
@@ -246,11 +246,11 @@ class MagicAccessorImpl {
 
 到这里关于GMA类和反射的关系就很清晰了，类似sun/reflect/GeneratedMethodAccessor123的类我们统称GMA类，GMA类是通过ASM字节码生成的MethodAccessor的实现类，主要作用是执行对真实方法Method的反射调用。GMA类不是默认生成的，而是需要NativeMethodAccessorImpl的实现下超过一定的阈值，才会优化成使用字节码。所以我们现在弄清楚了为什么会产生GMA类以及产生的时机，但是按前面分析流程methodAccessor都是会复用的，理论上一个方法最多只会生成一个GMA类，而这与我们在2.3节问题描述中提到的一个getter/setter方法生成多个GMA类的结论是矛盾的，所以下一个更重要的问题是为什么GMA类会重复生成？以及在什么条件下会重复生成？
 
-3.2 GeneratedMethodAccessor重复类生成的原因
+## 3.2 GeneratedMethodAccessor重复类生成的原因
 
 前面我们分析了字节码生成都是有相应条件的，既然要深入GMA重复类生成原因，我们就要先剖析一下影响GMA字节码类生成的inflation机制。前面我们了解到反射中的invoke可以通过JNI调用或者是字节码来完成，而inflation机制就是以提升反射执行速度为目的的优化，inflation机制主要是通过下面两个参数实现的。
 
-3.2.1 反射调用膨胀机制（inflation机制）
+### 3.2.1 反射调用膨胀机制（inflation机制）
 
 Java虚拟机会首先使用JNI存取器，然后在访问了同一个类若干次后，会改为使用Java字节码存取器。 这种当Java虚拟机从JNI存取器改为字节码存取器的行为被称为膨胀（Inflation）
 
@@ -286,7 +286,7 @@ native版本正好相反，启动时直接JNI调用较快，但持续运行因�
 ![image](/img/20231222-21.jpg)
 图21 HotSpot简介图
 
-3.2.2 生成GMA类过程中可能因为并发导致重复的原因分析
+### 3.2.2 生成GMA类过程中可能因为并发导致重复的原因分析
 
 前面有分析到默认情况下GMA生成只有一个地方，那就是在sun.reflect.NativeMethodAccessorImpl#invoke处（参考图20），分析这块代码不难发现在++numInvocations > ReflectionFactory.inflationThreshold()的判断条件处并没有加任何同步机制，虽然Method是复制出来的，多个线程持有的Method都是不同的，但methodAccessor是复用的，也就是多个线程反射调用使用的是同一个NativeMethodAccessorImpl的实例，而numInvocations是NativeMethodAccessorImpl的局部变量，在并发环境下可能有线程不安全的问题，可能会导致多个线程同时进入条件为true的代码块中，生成多个GMA类。而我们的线上应用一般都是并发环境，如果有一个反射方法的invoke()调用比较集中，那就可能在inflation机制阈值判断时，有多个线程进入GMA类的生成代码中。
 
@@ -294,7 +294,7 @@ native版本正好相反，启动时直接JNI调用较快，但持续运行因�
 ![image](/img/20231222-22.jpg)
 图22
 
-3.2.3 生成GMA类过程中可能因为软引用回收导致重复的分析
+### 3.2.3 生成GMA类过程中可能因为软引用回收导致重复的分析
 
 按3.2.2节分析因为并发线程安全的问题导致GMA类的增长，虽然会导致GMA类重复生成，但这个应该增长的量应该是有限的，因为一旦这个方法生成了对应的GMA类后续都会一直复用，但实际过程中会发现持续的类加载，我们再看下图20生成GMA的流程，因为前面我们已经判断到GMA类只有在这个地方生成，稍加分析不难发现这个if判断条件里最有可能变化的就是计数器numInvocations，因为默认要累加到15次才会生成GMA类，那持续有类加载的现象很可能是因为计数器清零了因为一旦计数器重置就可能再次生成GMA类，导致GMA类持续增长，那么计数器是否会重置以及为什么会重置？
 
@@ -306,11 +306,11 @@ native版本正好相反，启动时直接JNI调用较快，但持续运行因�
 
 所以如果应用持续运行，跨越了多个软引用回收周期，那么复用的这个methodAccessor可能随着原Method对象被回收，下次再通过JNI调用生成的就是一个全选的Method对象以及一个全新的methodAccessor对象，当然numInvocations计数器也会被重置，持续反射调用很可能再次触发阈值生成新的GMA类。
 
-3.3 通过实验验证并发和跨软引用周期导致GMA类重复
+## 3.3 通过实验验证并发和跨软引用周期导致GMA类重复
 
 对反射的执行过程有了一个了解后，我们大概能知道这里面为啥会重复生成GMA类了，为此我们专门设计对照组和实验组实验来实际验证下前面的结论是否符合预期。
 
-3.3.1 正常实验流程（无并发，单个软引用周期）
+### 3.3.1 正常实验流程（无并发，单个软引用周期）
 
 按正常实验流程GMA生成次数都是符合我们预期的，不会有重复GMA生成。
 
@@ -338,7 +338,7 @@ GMA类数量
 ![image](/img/20231222-25.jpg)
 图25
 
-3.3.2 有重复GMA类生成的流程
+### 3.3.2 有重复GMA类生成的流程
 
 经过上面软引用和并发安全的分析，我们特地设计了三组实验，参考上面正常对照组的结果对比实验充分地说明了GMA重复类的生成跟并发和软引用回收是相关的。
 
@@ -396,7 +396,7 @@ method1置null方便软引用回收，若不置为null，则在分配大对象�
 
 反射方法的methodAcessor为软引用会被JVM GC回收，回收后在下次method.invoke()执行会重置计数器，invoke次数超过阈值时会重新生成新的GMA类。
 
-3.4 问题梳理总结
+## 3.4 问题梳理总结
 
 有了前面的源码分析和实验结果验证，持续加载GMA类的过程就比较清晰了，下图直观地描述了重复GMA类加载的过程，对于重点地方我们用文字简单来总结下
 ![image](/img/20231222-30.jpg)
@@ -412,13 +412,13 @@ methodAccessor在一个软引用周期内只会初始化一次，作为实现类
 
 步骤3和步骤4会随着应用生命周期持续进行，直到元空间内存溢出触发OOM。
 
-4 解决方案
+# 4 解决方案
 
 到这里问题基本明确了，因为线上应用使用了Spring框架的org.springframework.beans.BeanUtils#copyProperties进行Bean到DTO的转换，框架底层是通过反射来实现对象的复制，因为线上应用涉及到比较多的业务类，在并发访问环境下跨多个软引用周期就会生成重复的GMA类直到元空间内存不足触发了元空间OOM，对此我们可以针对性地去优化。
 
-4.1 相关JVM参数调优方案
+## 4.1 相关JVM参数调优方案
 
-4.1.1 元空间大小相关JVM参数
+### 4.1.1 元空间大小相关JVM参数
 
 所有系统都应该注意元空间的大小设置，对于64位JVM来说元空间的默认初始大小是20.75MB，默认的元空间的最大值是无限，-XX:MetaspaceSize=N和-XX:MaxMetaspaceSize=N，由于元空间大小的扩容中需要Full GC，这是非常昂贵的操作，如果应用在启动的时候发生大量Full GC，通常都是由于永久代或元空间发生了大小调整，基于这种情况，一般建议在JVM参数中将MetaspaceSize和MaxMetaspaceSize设置成一样的值，下面介绍一个这两个参数的含义：
 
@@ -430,19 +430,19 @@ MaxMetaspaceSize：设置可以分配给类元空间的最大本地内存，默�
 
 最佳实践：建议将MetaspaceSize和MaxMetaspaceSize设置成一样的值避免扩容，对于8G物理内存的机器来说一般建议将这两个值都设置为256M（读者可以根据实际情况调整）
 
-4.1.2 inflationThreshold参数
+### 4.1.2 inflationThreshold参数
 
 JNI调用优化为GMA字节码的反射调用次数阈值可以通过参数-Dsun.reflect.inflationThreshold调整，因为inflationThreshold默认值是15，如果将inflationThreshold适当调大可以尽可能减少动态反射类的生成（如需关闭inflation，在Oracle JVM中没有直接关闭参数需要设置为int最大值，在IBM JVM中可以通过设置为0来关闭inflation）。但是这个动作需要谨慎，毕竟JNI的速度相对字节码还是很慢，如果应用对时间很敏感，不建议直接将inflationThreshold调为最大值，可以配合调整元空间的大小的同时将inflationThreshold调整到适当的值。
 
 最佳实践：默认值15，这个参数可以结合实际情况适当调大，如果要关闭inflation可以设置为Integer.MAX_VALUE，但关闭后会失去JIT反射性能优化，需要慎重操作
 
-4.1.3 noInflation参数
+### 4.1.3 noInflation参数
 
 还可以通过-Dsun.reflect.noInflation=false（默认是false）来关闭反射的优化，但仍然会有inflation机制生成字节码类。
 
 最佳实践：默认值false，一般不建议开启
 
-4.1.4 SoftRefLRUPolicyMSPerMB参数
+### 4.1.4 SoftRefLRUPolicyMSPerMB参数
 
 笔者在实际解决问题的过程中也调整过SoftRefLRUPolicyMSPerMB参数，实际调优发现效果并没有达到预期，这里也一并说明下。软引用对象在GC的时候到底要不要被回收是通过如下的一个公式来判定的，类似一个LRU缓存策略
 
@@ -466,11 +466,11 @@ SoftRefLRUPolicyMSPerMB参数默认值是0所以公式的右半边是0，就导�
 
 最佳实践：默认值1000毫秒，一般可将SoftRefLRUPolicyMSPerMB设为1000~10000毫秒
 
-4.1.5 升级高版本JDK
+### 4.1.5 升级高版本JDK
 
 高版本JDK有一些反射针对性的优化，可以参考4.3节
 
-4.2 应用实战调优
+## 4.2 应用实战调优
 
 4.1节提供了几种不同的JVM调优方案，笔者在应用中也有实践过，综合考虑实现成本以及B端应用对反射JNI调用额外增加的耗时（小于1ms）是可以接受的 ，实际优化方案是采取在JVM参数中增加 -Dsun.reflect.inflationThreshold=2147483647 参数来彻底关闭inflation机制，调整后效果如图33
 ![image](/img/20231222-32.jpg)
@@ -482,7 +482,7 @@ SoftRefLRUPolicyMSPerMB参数默认值是0所以公式的右半边是0，就导�
 
 这样调整后元空间更大、软引用回收更慢、inflation阈值更大，那么生成GMA类会放缓，虽然不能完全避免，但能够在反射调用耗时和类加载增长中找到一个平衡
 
-4.3 其他版本的JDK是否有类似的问题
+## 4.3 其他版本的JDK是否有类似的问题
 
 本文是聚焦在JDK 8的实现，对于其他版本的JDK是否也存在类似的问题，以及要如何去优化呢？
 
@@ -514,16 +514,17 @@ JDK 21
 ![image](/img/20231222-38.jpg)
 图38
 
-5 元空间OOM的其他典型案例分享
+# 5 元空间OOM的其他典型案例分享
 
 元空间OOM的排查相对来说套路比较固定，一般来说就是:1）检查JVM参数配置，查看JVM元空间大小分配；2）增加参数排查类加载卸载信息；3）反编译类定位业务场景，结合业务或框架代码定位根因。除了上文反射的问题外，笔者的团队也出过类似的其他问题，我们来看看具体的例子。
 
-5.1 关于元空间大小的设置
+## 5.1 关于元空间大小的设置
 
 笔者团队的一个应用从JDK 7升级到JDK 8后，每次JVM重启都会有两次FullGC会触发告警，虽然不影响后续对外提供服务，但每次重启必现告警也确实十分恼人。
 
 可以通过java命令（java -XX:+PrintFlagsFinal -version | grep  Meta）查看java进程的元空间大小发现元空间大小不到21MB，继续检查JVM参数发现是因为升级JDK 8后没有指定-XX:MetaspaceSize和-XX:MaxMetaspaceSize参数，所以元空间默认大小就是不到21MB，在JVM启动过程中加载类会进行元空间扩容，元空间扩容前会触发Full GC，因为有两次扩容所以会触发两次Full GC。
 
+```shell
 [localhost ~]$ java -XX:+PrintFlagsFinal -version | grep  Meta
     uintx InitialBootClassLoaderMetaspaceSize       = 4194304                             {product}
     uintx MaxMetaspaceExpansion                     = 5451776                             {product}
@@ -537,6 +538,7 @@ JDK 21
 java version "1.8.0_45"
 Java(TM) SE Runtime Environment (build 1.8.0_45-b14)
 Java HotSpot(TM) 64-Bit Server VM (build 25.45-b02, mixed mode)
+```
 
 -XX:PermSize=384m
 -XX:MaxPermSize=384m
@@ -546,7 +548,7 @@ Java HotSpot(TM) 64-Bit Server VM (build 25.45-b02, mixed mode)
 -XX:MetaspaceSize=384m
 -XX:MaxMetaspaceSize=384m
 
-5.2 持续类加载导致元空间OOM的另一种场景
+## 5.2 持续类加载导致元空间OOM的另一种场景
 
 从 JDK 8 开始，Nashorn取代Rhino(JDK 6, JDK 7) 成为 Java 的嵌入式 JavaScript 引擎。Nashorn 完全支持 ECMAScript 5.1 规范以及一些扩展。它使用基于 JSR 292 的新语言特性，其中包含在 JDK 7 中引入的 invokedynamic，将 JavaScript 编译成 Java 字节码。与先前的 Rhino 实现相比，这带来了2到10倍的性能提升。
 
@@ -566,15 +568,15 @@ Java HotSpot(TM) 64-Bit Server VM (build 25.45-b02, mixed mode)
 
 最佳实践：如果应用中有用到动态类加载的方式，如表达式执行引擎，groovy脚本，反射等，需要特别关注下类加载的情况，避免持续类加载的情况。
 
-6  总结
+# 6  总结
 
-6.1 方法区大小问题
+## 6.1 方法区大小问题
 
 JDK 8之前的永久代也可能会有类似的永久代OOM的情况，需要注意永久代的大小，排查的方法和JDK 8也基本类似的。
 
 JDK 8的元空间的默认初始大小只有20.75MB（64位JVM），注意元空间的大小设置避免元空间扩容和空间不足。
 
-6.2 相关优化参数
+## 6.2 相关优化参数
 
 参数
 
@@ -600,23 +602,23 @@ SoftRefLRUPolicyMSPerMB参数
 
 默认值=0
 
-6.3 监控层面
+## 6.3 监控层面
 
 增加类加载和元空间大小相关的配置项，在OOM前提前预警问题。
 
 配置应用主动GC释放内存空间。
 
-6.4 代码层面
+## 6.4 代码层面
 
 尽量避免反射的使用，性能不好同时还可能有类加载的问题，可以尝试用hession、protobuf等高性能序列化方式，如无法避免请注意前面提到的相关优化参数。
 
 尽量避免Groovy脚本，表达式执行引擎等重复加载类的情况，如有必要的话优化使用方式。
 
-6.5 研究方向
+## 6.5 研究方向
 
 目前网上关于JDK 21的资料比较少，后续继续研究下JDK 21下DirectMethodHandleAccessor的实现，看下在默认JNI调用下如何实现更好的性能，对这部分感兴趣的同学可以参考：method handles
 
-7 参考文献
+# 7 参考文献
 
 【2019-07-23】Metaspace OOM排查记录
 
