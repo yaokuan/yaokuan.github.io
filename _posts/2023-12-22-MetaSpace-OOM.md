@@ -89,6 +89,7 @@ JDK 8实际上是HotSpot与JRockit合并的，只是产品名字还是叫HotSpot
 
 为了进一步分析这些GeneratedMethodAccessor类是在哪里反射调用的，我们借助开源工具dumpclass下载这些类再通过反编译可以获取更多详细的信息
 
+```shell
 #下载dumpClass的jar包
 wget http://search.maven.org/remotecontent?filepath=io/github/hengyunabc/dumpclass/0.0.2/dumpclass-0.0.2.jar -O dumpclass.jar
 #dumpClass需要设置JAVA_HOME的环境变量
@@ -99,6 +100,7 @@ java -jar /dumpclass.jar -p [PID] -o / sun.reflect.GeneratedMethodAccessor*
 cd /sun/reflectsun.reflect.GeneratedMethodAccessor*
 #随便找一个反编译出来
 javap -verbose GeneratedMethodAccessor999
+```
 
 查看反编译class文件找到反射执行的位置（在class文件中找到invokevirtual关键字，对应的路径则为反射生成GeneratedMethodAccessor的业务代码）进行分析发现大量调用来源于业务中bean的Getter/Setter方法，通过脚本统计反编译类的invokevirtual属性发现存在同一个Getter方法生成多个GeneratedMethodAccessor的情况。
 ![image](/img/20231222-3.jpg)
@@ -169,9 +171,9 @@ java.lang.reflect.Method#invoke方法是反射执行调用的关键，在图9标
 
 先看下新建流程里，会通过sun.reflect.ReflectionFactory#newMethodAccessor去创建methodAccessor对象，图11中有两个条件来控制使用哪种方式创建MethodAccessor对象
 
-noInflation。是否关闭inflation机制[^1]，默认情况下noInflation为false，若设置为true则始终使用字节码方式生成GMA（可通过JVM参数 -Dsun.reflect.noinflation来设置）。
+1. noInflation。是否关闭inflation机制[^1]，默认情况下noInflation为false，若设置为true则始终使用字节码方式生成GMA（可通过JVM参数 -Dsun.reflect.noinflation来设置）。
 
-!ReflectUtil.isVMAnonymousClass。这个条件是判断方法所属的类非匿名类，因为匿名类不支持字节码的方式，同样的判定条件在NativeMethodAccessorImpl也有原因详见注释（图12）。
+2. !ReflectUtil.isVMAnonymousClass。这个条件是判断方法所属的类非匿名类，因为匿名类不支持字节码的方式，同样的判定条件在NativeMethodAccessorImpl也有原因详见注释（图12）。
 
 因为noInflation参数默认为false，会进入到else内部生成NativeMethodAccessorImpl对象并给DelegatingMethodAccessorImpl代理执行。
 
