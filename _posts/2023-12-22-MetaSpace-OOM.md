@@ -31,7 +31,7 @@ tags:       Java GC JVM
 
 线上某个应用突然开始不停地有 java.lang.OutOfMemoryError: Metaspace 告警，看元空间占用内存一直在增长的，一般来说元空间的增长都是因为类加载导致的。继续看了下应用的 jvm.classloading.loaded.count 指标趋势图，基本一直在增长直到下一次服务发布或者是Full GC时才会降下来一些，如果应用间隔了一段时间没有发布就会频繁Full GC直到元空间OOM告警，为了搞清楚元空间OOM的根因，首先得了解下什么是元空间。
 
-![image](/img/20231222-1.png)
+![image](/img/20231222-1.jpg)
 图1 应用类加载数量趋势图
 
 2.2 元空间介绍
@@ -44,7 +44,7 @@ tags:       Java GC JVM
 
 存储内容不同。永久代存储类信息、字面量、类静态变量和符号引用，而元空间只存储类信息，实际上移除永久代的工作从JDK 7就开始了，符号引用转移到了Native heap，字面量和类静态变量转移到了Java heap。
 
-![image](/img/20231222-2.png)
+![image](/img/20231222-2.jpg)
 图2 元空间和永久代的区别
 
 那为什么JDK 8要新引入元空间来替换永久代？
@@ -103,7 +103,7 @@ cd /sun/reflectsun.reflect.GeneratedMethodAccessor*
 javap -verbose GeneratedMethodAccessor999
 
 查看反编译class文件找到反射执行的位置（在class文件中找到invokevirtual关键字，对应的路径则为反射生成GeneratedMethodAccessor的业务代码）进行分析发现大量调用来源于业务中bean的Getter/Setter方法，通过脚本统计反编译类的invokevirtual属性发现存在同一个Getter方法生成多个GeneratedMethodAccessor的情况。
-![image](/img/20231222-3.png)
+![image](/img/20231222-3.jpg)
 图3 反编译字节码类查看业务调用源头
 
 2.3.3 初步问题分析的结论引出重复类加载的疑点
@@ -124,20 +124,24 @@ javap -verbose GeneratedMethodAccessor999
 
 首先我们需要了解反射调用执行大概的过程，先看一个简单的反射例子，下面是通过反射调用拿到了person的id，首先要通过Person类获取对应的getId方法，然后执行对应的反射方法method.invoke()。
 
+![image](/img/20231222-4.jpg)
 图4 一个反射例子
 
 这里java.lang.Class#getMethod和java.lang.reflect.Method#invoke是比较关键的两个方法，为了大家可以更好地理解反射的执行流程，我们通过下面的时序图大致画出如图4例子反射调用的执行过程，让大家先有一个大概的印象，其中有许多细节在下文中慢慢展开。
 
+![image](/img/20231222-5.jpg)
 图5 反射调用执行时序图
 
 3.1.1 通过Class如何获取反射方法
 
 我们先来看下是怎么找到方法的，顺着java.lang.Class#getMethod往下会发现查找方法都会走到java.lang.Class#privateGetDeclaredMethods内部，publicOnly参数是用来控制是否只返回声明为public的方法，这里以图4为例publicOnly参数为true，对应返回declaredPublicMethods，方法内会首先判断ReflectionData是否为空，这是一个Class内部的软引用相当于本地缓存的作用，图6标红第3处会判断缓存内部的declaredPublicMethods是否为空，如果缓存内非空优先返回缓存内的，否则调用JNI获取类声明的public方法并放入缓存中。
 
+![image](/img/20231222-6.jpg)
 图6 获取Class内的Method
 
 再看下方法的缓存是在java.lang.Class#reflectionData方法获取的，前面有提到reflectionData相当于本地缓存（图7标红1处是在Class内部声明为软引用的局部变量），软引用常被用来当做缓存使用是因为其特殊的回收机制（3.2.3小节有介绍）。useCaches参数初始化为true，在图7标红3处可以通过系统变量-Dsun.reflect.noCaches关闭，所以默认开启缓存并返回缓存对象（不存在则新建一个空缓存返回）。
 
+![image](/img/20231222-7.jpg)
 图7 Class内软引用的使用
 
 通过上面的步骤就找到了Class声明的所有public方法，之后就要从中找到我们需要的那一个，在java.lang.Class#searchMethods方法中会通过方法名找到完全匹配的方法Method，然后在图8标红2处复制一个Method对象返回，复制过程使用的是java.lang.reflect.Method#copy方法，关于Method的复制我们后面还会再提到，这里只要暂时先知道方法的复制会深拷贝一个Method对象返回即可。至于为什么要每次进行拷贝而不能直接用找到的method呢？笔者认为这里至少有两个原因
@@ -146,6 +150,7 @@ javap -verbose GeneratedMethodAccessor999
 
 原有的method是一个全局变量，如果直接使用了原有的method，可能会对该method有一定的修改，该method会被多个线程使用，从而导致某个线程某处对method修改后，对别的线程产生影响，getMethod方法每次都会copy出一个新的副本method，可以减少同一线程内和不同线程间method修改产生的影响。
 
+![image](/img/20231222-8.jpg)
 图8 通过方法名搜索Method
 
 至此我们就通过Class获取到了对应的方法Method对象，这个Method对象是对原对象的一个深拷贝，之后就要进行反射调用了。
@@ -156,10 +161,12 @@ javap -verbose GeneratedMethodAccessor999
 
 java.lang.reflect.Method#invoke方法是反射执行调用的关键，在图9标红1可以看到invoke()内部声明了一个局部变量ma它是MethodAccessor接口的一个实例化对象，而MethodAccessor接口定义了反射具体行为，Method.invoke的真正逻辑在图9标红3处的ma.invoke(obj, args)中，因为实际执行逻辑是委托给MethodAccessor进行的，所以这里我们首先要搞清楚MethodAccessor是如何生成的以及如何利用MethodAccessor来执行反射调用。
 
+![image](/img/20231222-9.jpg)
 图9 invoke方法的流程
 
 在图9标红2处可以看到获取MethodAccessor实例并赋值给ma，进入acquireMethodAccessor()方法内部，在图10中有明确的if...else两条代码分支，明确了两种不同的MethodAccessor实现，这两种实现都非常重要。if内部是复用root的MethodAccessor，root是Method内的局部变量（图10标红5），类型也是Method，前面有提到我们获取的Method对象都是深拷贝的，这个root就是指向的原Method对象，而else内部是新建MethodAccessor的方式。前面图6标红2的JNI调用获取的Method的methodAccessor默认值是null的，Method的methodAccessor变量被设计成懒加载的（图10标红4），笔者推测这是因为虚拟机不知道方法何时被反射调用，所以为了节省内存开销设计成了懒加载。所以默认第一次反射调用会进入到图10标红2执行新建流程。
 
+![image](/img/20231222-10.jpg)
 图10 获取和生成MethodAccessor流程
 
 先看下新建流程里，会通过sun.reflect.ReflectionFactory#newMethodAccessor去创建methodAccessor对象，图11中有两个条件来控制使用哪种方式创建MethodAccessor对象
@@ -170,8 +177,9 @@ noInflation。是否关闭inflation机制，默认情况下noInflation为false�
 
 因为noInflation参数默认为false，会进入到else内部生成NativeMethodAccessorImpl对象并给DelegatingMethodAccessorImpl代理执行。
 
+![image](/img/20231222-11.jpg)
 图11 新建methodAccessor流程
-
+![image](/img/20231222-12.jpg)
 图12
 
 3.1.2.2 关于MethodAccessor接口和它的实现类
