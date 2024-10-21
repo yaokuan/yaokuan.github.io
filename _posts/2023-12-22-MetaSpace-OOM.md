@@ -538,13 +538,17 @@ Java(TM) SE Runtime Environment (build 1.8.0_45-b14)
 Java HotSpot(TM) 64-Bit Server VM (build 25.45-b02, mixed mode)
 ```
 
+```shell
 -XX:PermSize=384m
 -XX:MaxPermSize=384m
+```
 
 而修改后加上相应的参数后再重启就没有Full GC告警了。
 
+```shell
 -XX:MetaspaceSize=384m
 -XX:MaxMetaspaceSize=384m
+```
 
 ## 5.2 持续类加载导致元空间OOM的另一种场景
 
@@ -575,30 +579,11 @@ JDK 8之前的永久代也可能会有类似的永久代OOM的情况，需要注
 JDK 8的元空间的默认初始大小只有20.75MB（64位JVM），注意元空间的大小设置避免元空间扩容和空间不足。
 
 ## 6.2 相关优化参数
+|参数|说明|备注|
+|inflationThreshold参数|为避免反射膨胀可以适当调整|注意Oracle JVM和IBM JVM对于0的实现不同|
+|noInflation参数|反射字节码优化开关|默认值=false|
+|SoftRefLRUPolicyMSPerMB参数|软引用回收LRU策略关键参数|默认值=0|
 
-参数
-
-说明
-
-备注
-
-inflationThreshold参数
-
-为避免反射膨胀可以适当调整
-
-注意Oracle JVM和IBM JVM对于0的实现不同
-
-noInflation参数
-
-反射字节码优化开关
-
-默认值=false
-
-SoftRefLRUPolicyMSPerMB参数
-
-软引用回收LRU策略关键参数
-
-默认值=0
 
 ## 6.3 监控层面
 
