@@ -20,7 +20,7 @@ tags:       Java 反射 类加载 JDK 元空间 OOM 软引用 并发线程安全
 # 1 背景
 > 标签： Java 反射 类加载 JDK 元空间 OOM 软引用 并发线程安全
 
-笔者在生产实践中碰到过很多OOM相关的问题，其中因为元空间引发的OOM问题不在少数，大多数堆内存的问题结合JVM参数、GC日志、堆dump分析还是比较容易有清晰的方向的，而元空间的问题往往是比较难定位的。因此笔者借助一次元空间OOM的排查经历来详细了解下什么是元空间，为什么元空间会OOM以及如何避免。为了让读者能够快速有个大概的印象，先介绍下本文的写作思路，本文会从问题描述，介绍元空间，分析案例现象引出频繁类加载问题，在过程中会了解反射执行过程，初识GeneratedMethodAccessor类，分析GeneratedMethodAccessor类重复加载的原因，进行实验验证，JVM参数调优实践。这个过程中会涉及到反射调用的实现细节，膨胀（inflation）机制及其解决的问题，反射和软引用的关系，反射过程中的线程安全，JVM参数调优等知识点，本文主要围绕JDK 8来展开排查和调优过程，也会介绍JDK 7/11/17/21等版本的反射实现和调优思路。
+笔者在生产实践中碰到过很多OOM相关的问题，其中因为元空间引发的OOM问题不在少数，大多数堆内存的问题结合JVM参数、GC日志、堆dump分析还是比较容易有清晰的方向的，而元空间的问题往往是比较难定位的。因此笔者借助一次元空间OOM的排查经历来详细了解下什么是元空间，为什么元空间会OOM以及如何避免。为了让读者能够快速有个大概的印象，先介绍下本文的写作思路，本文会从问题描述，介绍元空间，分析案例现象引出频繁类加载问题，在过程中会了解反射执行过程，初识`GeneratedMethodAccessor`类，分析GeneratedMethodAccessor类重复加载的原因，进行实验验证，JVM参数调优实践。这个过程中会涉及到反射调用的实现细节，膨胀（inflation）机制及其解决的问题，反射和软引用的关系，反射过程中的线程安全，JVM参数调优等知识点，本文主要围绕JDK 8来展开排查和调优过程，也会介绍JDK 7/11/17/21等版本的反射实现和调优思路。
 
 # 2 一个线上元空间OOM案例
 
@@ -183,7 +183,7 @@ ma.invoke(obj, args)中，因为实际执行逻辑是委托给MethodAccessor进�
 
 #### 3.1.2.2 关于MethodAccessor接口和它的实现类
 
-MethodAccessor接口定义了反射主要的行为，图11中可以看到 NativeMethodAccessorImpl（本地方法调用类）交给了DelegatingMethodAccessorImpl（代理类）代理执行，除这两种外还有 MethodAccessorImpl（抽象实现类）和GeneratedMethodAccessor（字节码类）。我们会发现在JDK源码中根本找不到GeneratedMethodAccessor这个类，是因为这是ASM字节码生成的类，看源码字节码生成方法返回的是MagicAccessorImpl，这是个什么类？
+MethodAccessor接口定义了反射主要的行为，图11中可以看到 NativeMethodAccessorImpl（本地方法调用类）交给了DelegatingMethodAccessorImpl（代理类）代理执行，除这两种外还有 MethodAccessorImpl（抽象实现类）和GeneratedMethodAccessor[^2]（字节码类）。我们会发现在JDK源码中根本找不到GeneratedMethodAccessor这个类，是因为这是ASM字节码生成的类，看源码字节码生成方法返回的是MagicAccessorImpl，这是个什么类？
 
 原本Java的安全机制使得不同类之间不是任意信息都可见，但JDK里面专门设了个MagicAccessorImpl标记类开了个后门来允许不同类之间信息可以互相访问（由JVM管理），所以MethodAccessorImpl类继承MagicAccessorImpl类后可以访问字节码生成的GeneratedMethodAccessor类信息。
 
@@ -532,7 +532,7 @@ JDK 8的元空间的默认初始大小只有20.75MB（64位JVM），注意元空
 
 |参数|说明|备注|
 | ----------- | ----------- | ----------- |
-|inflationThreshold参数|为避免反射膨胀可以适当调整|注意Oracle JVM和IBM JVM对于0的实现不同|
+|inflationThreshold参数|为避免反射膨胀可以适当调整|注意Oracle JVM和IBM JVM对于0的实现不同[^3]|
 |noInflation参数|反射字节码优化开关|默认值=false|
 |SoftRefLRUPolicyMSPerMB参数|软引用回收LRU策略关键参数|默认值=0|
 
@@ -553,17 +553,11 @@ JDK 8的元空间的默认初始大小只有20.75MB（64位JVM），注意元空
 目前网上关于JDK 21的资料比较少，后续继续研究下JDK 21下DirectMethodHandleAccessor的实现，看下在默认JNI调用下如何实现更好的性能，对这部分感兴趣的同学可以参考：method handles
 
 # 7 参考文献
-
-1.R大-关于反射调用方法的一个log
-
+1.[R大-关于反射调用方法的一个log](https://blog.csdn.net/rednaxelafx/article/details/83517409)
 2.《深入理解Java虚拟机》-周志明
+3.[OpenJDK](http://openjdk.java.net/jeps/122)
+4.[ASM](http://attic-distfiles.pld-linux.org/distfiles/distfiles/by-md5/5/f/5f17bfac3563feb108793575f74ce27c/asm-eng.pdf)
 
-3.http://openjdk.java.net/jeps/122
-
-4.ASM
-
-[^1]: inflation机制：参考第3.2.1节
-
-GeneratedMethodAccessor：这个是字节码生成的方法描述类，源码中是找不到这个类的，标在这里是为了让大家知道除了native实现外还有一种GMA字节码的方式
-
-注意Oracle JVM和IBM JVM对于0的实现不同：Oracle JVM的实现里0是指不设阈值每次都会生成字节码类，而IBM JVM实现里0是关闭inflation机制
+[^1]:inflation机制：参考第3.2.1节
+[^2]:GeneratedMethodAccessor：这个是字节码生成的方法描述类，源码中是找不到这个类的，标在这里是为了让大家知道除了native实现外还有一种GMA字节码的方式
+[^3]:注意Oracle JVM和IBM JVM对于0的实现不同：Oracle JVM的实现里0是指不设阈值每次都会生成字节码类，而IBM JVM实现里0是关闭inflation机制
