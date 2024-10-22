@@ -410,7 +410,7 @@ JNI调用优化为GMA字节码的反射调用次数阈值可以通过参数`-Dsu
 
 ## 4.2 应用实战调优
 
-4.1节提供了几种不同的JVM调优方案，笔者在应用中也有实践过，综合考虑实现成本以及B端应用对反射JNI调用额外增加的耗时（小于1ms）是可以接受的 ，实际优化方案是采取在JVM参数中增加 `-Dsun.reflect.inflationThreshold=2147483647` 参数来彻底关闭inflation机制，调整后效果如图33
+4.1节提供了几种不同的JVM调优方案，笔者在应用中也有实践过，综合考虑实现成本以及B端应用对反射JNI调用额外增加的耗时（小于1ms）是可以接受的 ，实际优化方案是采取在JVM参数中增加 `-Dsun.reflect.inflationThreshold=2147483647` 参数来彻底关闭inflation机制，调整后效果如图32
 ![image](/img/20231222-32.jpg)
 <center style="color:gray">图32 应用调优后的类加载情况</center>
 
