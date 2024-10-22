@@ -312,81 +312,23 @@ inflationThreshold参数，在**sun.reflect.NativeMethodAccessorImpl#invoke**处
 
 按正常实验流程GMA生成次数都是符合我们预期的，不会有重复GMA生成。
 
-场景
+| 场景描述                      | GMA类数量 | 源码截图                       |
+|-----------------------------|----------|--------------------------|
+| 单线程一个method.invoke15次   | 0        | ![image](/img/20231222-23.jpg) <br><center style="color:gray">图23</center> |
+| 单线程一个method.invoke16次   | 1        | ![image](/img/20231222-24.jpg) <br><center style="color:gray">图24</center> |
+| 单线程两个method.invoke各10000次 | 2        | ![image](/img/20231222-25.jpg) <br><center style="color:gray">图25</center> |
 
-GMA类数量
-
-源码截图
-
-单线程一个method.invoke15次
-
-0
-![image](/img/20231222-23.jpg)
-<center style="color:gray">图23</center>
-
-单线程一个method.invoke16次
-
-1
-![image](/img/20231222-24.jpg)
-<center style="color:gray">图24</center>
-
-单线程两个method.invoke各10000次
-
-2
-![image](/img/20231222-25.jpg)
-<center style="color:gray">图25</center>
 
 ### 3.3.2 有重复GMA类生成的流程
 
 经过上面软引用和并发安全的分析，我们特地设计了三组实验，参考上面正常对照组的结果对比实验充分地说明了GMA重复类的生成跟并发和软引用回收是相关的。
 
-场景
+| 场景描述                          | GMA类数量 | 截图                       | 原因分析                                                                                                      |
+|---------------------------------|----------|--------------------------|-----------------------------------------------------------------------------------------------------------|
+| 无并发多周期                        | 2        | ![image](/img/20231222-26.jpg) | method1置null方便软引用回收，若不置为null，则在分配大对象回收软引用时，因为有强引用而不能回收，无法复现多个GMA的场景。分配大对象，触发分配失败的Full GC，系统回收软引用后打印为null。调用invoke 15次以上触发阈值，会生成新的GMA类。 |
+| 并发单周期                          | 20       | ![image](/img/20231222-27.jpg) | 在第一个线程超过阈值进入生成字节码到第一个ma生成并赋值给method对象过程中的其他线程都可能会重复生成GMA，过程如图29。![image](/img/20231222-28.jpg) |
+| 并发多周期                          | 28       | ![image](/img/20231222-29.jpg) | 第一个软引用周期，预期最多生成20个，实际生成20个GMA类，之后不再新生成。中间分配大对象手动触发一次软引用回收，打印为null（图30）。第二个软引用周期，预期最多生成20个，实际生成8个GMA类，之后不再新生成。                   |
 
-GMA类数量
-
-源码截图
-
-原因分析
-
-无并发多周期
-
-单线程一个method.invoke1000次，跨两个软引用周期
-
-2
-![image](/img/20231222-26.jpg)
-<center style="color:gray">图26</center>
-
-method1置null方便软引用回收，若不置为null，则在分配大对象回收软引用时，因为有强引用而不能回收，无法复现多个GMA的场景
-
-分配大对象，触发分配失败的Full GC，系统回收软引用后打印为null
-
-调用invoke 15次以上触发阈值，会生成新的GMA类
-
-并发单周期
-
-20线程一个method.invoke10000次
-
-20
-![image](/img/20231222-27.jpg)
-<center style="color:gray">图27</center>
-
-在第一个线程超过阈值进入生成字节码到第一个ma生成并赋值给method对象过程中的其他线程都可能会重复生成GMA，过程如图29
-![image](/img/20231222-28.jpg)
-<center style="color:gray">图28</center>
-
-并发多周期
-
-20个线程跨2个软引用对象生命周期
-
-28
-![image](/img/20231222-29.jpg)
-<center style="color:gray">图29</center>
-
-第一个软引用周期，预期最多生成20个，实际生成20个GMA类，之后不再新生成
-
-中间分配大对象手动触发一次软引用回收，打印为null（图30）
-
-第二个软引用周期，预期最多生成20个，实际生成8个GMA类，之后不再新生成
 
 结合源码和实验分析有重复GMA类生成的主要原因有两个：
 
@@ -612,19 +554,13 @@ JDK 8的元空间的默认初始大小只有20.75MB（64位JVM），注意元空
 
 # 7 参考文献
 
-【2019-07-23】Metaspace OOM排查记录
+1.R大-关于反射调用方法的一个log
 
-【2021-03-10】Nashorn JavaScript导致fullgc排查
+2.《深入理解Java虚拟机》-周志明
 
-一次元空间OOM问题的深度历险
+3.http://openjdk.java.net/jeps/122
 
-R大-关于反射调用方法的一个log
-
-《深入理解Java虚拟机》-周志明
-
-http://openjdk.java.net/jeps/122
-
-ASM
+4.ASM
 
 [^1]: inflation机制：参考第3.2.1节
 
