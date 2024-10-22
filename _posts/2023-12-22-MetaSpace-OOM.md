@@ -108,8 +108,8 @@ javap -verbose GeneratedMethodAccessor999
 ### 2.3.2 初步问题分析的结论引出重复类加载的疑点
 
 所以关于频繁的`GeneratedMethodAccessor`类加载我们初步得出下面几个结论：
-1.生成的`GeneratedMethodAccessor`类大多是正常业务代码相关的，各种类都有并没有某一特定Getter/Setter方法生成大量的`GeneratedMethodAccessor`类。
-2.同一个业务类的Getter/Setter方法存在生成多个`GeneratedMethodAccessor`类的情况，也就是可能会出现重复加载`GeneratedMethodAccessor`类的情况。
+1.生成的`GeneratedMethodAccessor`类大多是正常业务代码相关的，各种类都有并没有某一特定`Getter/Setter`方法生成大量的`GeneratedMethodAccessor`类。
+2.同一个业务类的`Getter/Setter`方法存在生成多个`GeneratedMethodAccessor`类的情况，也就是可能会出现重复加载`GeneratedMethodAccessor`类的情况。
 第2点结论比较反直觉，我们一般认为对于某个反射方法已经是非常明确的了，所生成的字节码类应该只有唯一的一个且是可以复用的，如果是这样的话因为业务类的数量是固定的，那么对应反射方法的动态类加载数量理论上也应该是固定的。但实际上反射相关的类是持续增长且有重复加载的现象，也正是因为重复加载才会出现类数量持续增加最终导致元空间OOM的情况。所以为什么会出现重复加载的情况应该是问题的关键，我们带着疑问继续往下看。
 
 # 3 初识反射相关类GeneratedMethodAccessor（GMA）
@@ -284,23 +284,23 @@ inflationThreshold参数，在`sun.reflect.NativeMethodAccessorImpl#invoke`处
 
 ### 3.2.2 生成GMA类过程中可能因为并发导致重复的原因分析
 
-前面有分析到默认情况下GMA生成只有一个地方，那就是在`sun.reflect.NativeMethodAccessorImpl#invoke`处（参考图20），分析这块代码不难发现在`++numInvocations > ReflectionFactory.inflationThreshold`的判断条件处并没有加任何同步机制，虽然Method是复制出来的，多个线程持有的Method都是不同的，但methodAccessor是复用的，也就是多个线程反射调用使用的是同一个NativeMethodAccessorImpl的实例，而numInvocations是NativeMethodAccessorImpl的局部变量，在并发环境下可能有线程不安全的问题，可能会导致多个线程同时进入条件为true的代码块中，生成多个GMA类。而我们的线上应用一般都是并发环境，如果有一个反射方法的invoke()调用比较集中，那就可能在inflation机制阈值判断时，有多个线程进入GMA类的生成代码中。
+前面有分析到默认情况下GMA生成只有一个地方，那就是在`sun.reflect.NativeMethodAccessorImpl#invoke`处（参考图20），分析这块代码不难发现在`++numInvocations > ReflectionFactory.inflationThreshold`的判断条件处并没有加任何同步机制，虽然Method是复制出来的，多个线程持有的Method都是不同的，但methodAccessor是复用的，也就是多个线程反射调用使用的是同一个`NativeMethodAccessorImpl`的实例，而`numInvocations`是`NativeMethodAccessorImpl`的局部变量，在并发环境下可能有线程不安全的问题，可能会导致多个线程同时进入条件为true的代码块中，生成多个GMA类。而我们的线上应用一般都是并发环境，如果有一个反射方法的`invoke()`调用比较集中，那就可能在inflation机制阈值判断时，有多个线程进入GMA类的生成代码中。
 
-其实method.invoke的过程中未加同步机制是JDK 8设计如此，除了上面提到的地方外，还有另外一处在获取MethodAccessor的方法acquireMethodAccessor()方法注释处也有给出说明。在并发环境下可能有多个线程进入else代码块生成MethodAccessor对象，所以可能生成多个NativeMethodAccessorImpl和DelegatingMethodAccessorImpl对象，然后会有一个线程去setMethodAccessor(tmp)，因为Method内的MethodAccessor被声明为volatile的立马对其他线程可见，后续就会复用MethodAccessor对象。所以正如下图注释中解释的，可能会生成多个MethodAccessor对象但不影响反射调用执行结果，且这种不加同步的实现方式会具有更好的扩展性。
+其实method.invoke的过程中未加同步机制是JDK 8设计如此，除了上面提到的地方外，还有另外一处在获取`MethodAccessor`的方法`acquireMethodAccessor()`方法注释处也有给出说明。在并发环境下可能有多个线程进入else代码块生成MethodAccessor对象，所以可能生成多个`NativeMethodAccessorImpl`和`DelegatingMethodAccessorImpl`对象，然后会有一个线程去`setMethodAccessor(tmp)`，因为Method内的MethodAccessor被声明为volatile的立马对其他线程可见，后续就会复用MethodAccessor对象。所以正如下图注释中解释的，可能会生成多个MethodAccessor对象但不影响反射调用执行结果，且这种不加同步的实现方式会具有更好的扩展性。
 ![image](/img/20231222-22.jpg)
 <center style="color:gray">图22</center>
 
 ### 3.2.3 生成GMA类过程中可能因为软引用回收导致重复的分析
 
-按3.2.2节分析因为并发线程安全的问题导致GMA类的增长，虽然会导致GMA类重复生成，但这个应该增长的量应该是有限的，因为一旦这个方法生成了对应的GMA类后续都会一直复用，但实际过程中会发现持续的类加载，我们再看下图20生成GMA的流程，因为前面我们已经判断到GMA类只有在这个地方生成，稍加分析不难发现这个if判断条件里最有可能变化的就是计数器numInvocations，因为默认要累加到15次才会生成GMA类，那持续有类加载的现象很可能是因为计数器清零了因为一旦计数器重置就可能再次生成GMA类，导致GMA类持续增长，那么计数器是否会重置以及为什么会重置？
+按3.2.2节分析因为并发线程安全的问题导致GMA类的增长，虽然会导致GMA类重复生成，但这个应该增长的量应该是有限的，因为一旦这个方法生成了对应的GMA类后续都会一直复用，但实际过程中会发现持续的类加载，我们再看下图20生成GMA的流程，因为前面我们已经判断到GMA类只有在这个地方生成，稍加分析不难发现这个if判断条件里最有可能变化的就是计数器`numInvocations`，因为默认要累加到15次才会生成GMA类，那持续有类加载的现象很可能是因为计数器清零了因为一旦计数器重置就可能再次生成GMA类，导致GMA类持续增长，那么计数器是否会重置以及为什么会重置？
 
-因为numInvocations是NativeMethodAccessorImpl的局部变量，内部没有其他地方修改，那么最有可能就是NativeMethodAccessorImpl实例变了，再联想到前面分析的所有复制出来的Method都是指向同一个methodAccessor，那么不能复用的情况可能是methodAccessor不能再被引用到了。这里面有一个值得注意的点，ReflectionData的对象被设计为一个软引用SoftReference来充当缓存减少JNI调用，而软引用的回收时机总得来说有两个
+因为`numInvocations`是`NativeMethodAccessorImpl`的局部变量，内部没有其他地方修改，那么最有可能就是`NativeMethodAccessorImpl`实例变了，再联想到前面分析的所有复制出来的Method都是指向同一个`methodAccessor`，那么不能复用的情况可能是`methodAccessor`不能再被引用到了。这里面有一个值得注意的点，`ReflectionData`的对象被设计为一个软引用`SoftReference`来充当缓存减少JNI调用，而软引用的回收时机总得来说有两个
 
 1.内存充足，软引用的回收使用LRU算法，存活时间越长该软引用对象越容易被回收，可以通过`-XX:SoftRefLRUPolicyMSPerMB`参数控制回收的时机
 
 2.内存不足，在OOM或者快要OOM时软引用的回收算法是全量回收
 
-所以如果应用持续运行，跨越了多个软引用回收周期，那么复用的这个methodAccessor可能随着原Method对象被回收，下次再通过JNI调用生成的就是一个全选的Method对象以及一个全新的methodAccessor对象，当然numInvocations计数器也会被重置，持续反射调用很可能再次触发阈值生成新的GMA类。
+所以如果应用持续运行，跨越了多个软引用回收周期，那么复用的这个`methodAccessor`可能随着原Method对象被回收，下次再通过JNI调用生成的就是一个全选的Method对象以及一个全新的`methodAccessor`对象，当然`numInvocations`计数器也会被重置，持续反射调用很可能再次触发阈值生成新的GMA类。
 
 ## 3.3 通过实验验证并发和跨软引用周期导致GMA类重复
 
@@ -330,9 +330,9 @@ inflationThreshold参数，在`sun.reflect.NativeMethodAccessorImpl#invoke`处
 
 结合源码和实验分析有重复GMA类生成的主要原因有两个：
 
-生成GMA的过程不是线程安全的，在并发的环境下可能会有多个线程重复生成反射方法的GMA类。
+1.生成GMA的过程不是线程安全的，在并发的环境下可能会有多个线程重复生成反射方法的GMA类。
 
-反射方法的methodAcessor为软引用会被JVM GC回收，回收后在下次method.invoke()执行会重置计数器，invoke次数超过阈值时会重新生成新的GMA类。
+2.反射方法的methodAcessor为软引用会被JVM GC回收，回收后在下次method.invoke()执行会重置计数器，invoke次数超过阈值时会重新生成新的GMA类。
 
 ## 3.4 问题梳理总结
 
@@ -340,13 +340,13 @@ inflationThreshold参数，在`sun.reflect.NativeMethodAccessorImpl#invoke`处
 ![image](/img/20231222-30.jpg)
 <center style="color:gray">图30</center>
 
-1.每个Class都有一个软引用类型的ReflectionData数据结构，设计为软引用是作为缓存来加速反射的调用，ReflectionData中存储着当前类中的字段、方法等元信息，通过JNI获取的字段、方法等元信息会放到ReflectionData中。
+1.每个Class都有一个软引用类型的`ReflectionData`数据结构，设计为软引用是作为缓存来加速反射的调用，`ReflectionData`中存储着当前类中的字段、方法等元信息，通过JNI获取的字段、方法等元信息会放到`ReflectionData`中。
 
-2.获取反射方法时通过方法名匹配到对应的Method对象，出于线程安全考虑，每个新获取的method对象都是对原对象的深拷贝（字段、方法等），同时会复用methodAccessor，原Method和所有复制出的Method都指向同一个methodAccessor。
+2.获取反射方法时通过方法名匹配到对应的Method对象，出于线程安全考虑，每个新获取的method对象都是对原对象的深拷贝（字段、方法等），同时会复用`methodAccessor`，原Method和所有复制出的Method都指向同一个`methodAccessor`。
 
-3.methodAccessor在一个软引用周期内只会初始化一次，作为实现类NativeMethodAccessorImpl的对象中numInvocations会从零开始计数，与inflationThreshold进行比较，此时如果有并发等情况出现，多个线程持有相同的methodAcessor时，调用invoke都会使numInvocations自增，此时因为线程不安全如果有多个线程同时判断numInvocations超过阈值时就都会去创建一个GMA对象，GMA类就会重复生成。
+3.`methodAccessor`在一个软引用周期内只会初始化一次，作为实现类`NativeMethodAccessorImpl`的对象中`numInvocations`会从零开始计数，与`inflationThreshold`进行比较，此时如果有并发等情况出现，多个线程持有相同的`methodAcessor`时，调用invoke都会使`numInvocations`自增，此时因为线程不安全如果有多个线程同时判断`numInvocations`超过阈值时就都会去创建一个GMA对象，GMA类就会重复生成。
 
-4.如果跨多个软引用周期，当Class的软引用被回收后，下次获取Method时就会通过JNI生成一个新的Method对象，然后在执行反射方法调用时再生成一个新的methodAccessor对象，那新的NativeMethodAccessorImpl的对象中numInvocations会清零，超过阈值就会生成GMA类，此时如果有并发情况还可能生成更多的GMA类。
+4.如果跨多个软引用周期，当Class的软引用被回收后，下次获取Method时就会通过JNI生成一个新的Method对象，然后在执行反射方法调用时再生成一个新的`methodAccessor`对象，那新的`NativeMethodAccessorImpl`的对象中`numInvocations`会清零，超过阈值就会生成GMA类，此时如果有并发情况还可能生成更多的GMA类。
 
 5.步骤3和步骤4会随着应用生命周期持续进行，直到元空间内存溢出触发OOM。
 
@@ -358,53 +358,51 @@ inflationThreshold参数，在`sun.reflect.NativeMethodAccessorImpl#invoke`处
 
 ### 4.1.1 元空间大小相关JVM参数
 
-所有系统都应该注意元空间的大小设置，对于64位JVM来说元空间的默认初始大小是20.75MB，默认的元空间的最大值是无限，`-XX:MetaspaceSize=N和-XX:MaxMetaspaceSize=N`，由于元空间大小的扩容中需要Full GC，这是非常昂贵的操作，如果应用在启动的时候发生大量Full GC，通常都是由于永久代或元空间发生了大小调整，基于这种情况，一般建议在JVM参数中将MetaspaceSize和MaxMetaspaceSize设置成一样的值，下面介绍一个这两个参数的含义：
+所有系统都应该注意元空间的大小设置，对于64位JVM来说元空间的默认初始大小是20.75MB，默认的元空间的最大值是无限，`-XX:MetaspaceSize=N和-XX:MaxMetaspaceSize=N`，由于元空间大小的扩容中需要`Full GC`，这是非常昂贵的操作，如果应用在启动的时候发生大量Full GC，通常都是由于永久代或元空间发生了大小调整，基于这种情况，一般建议在JVM参数中将`MetaspaceSize`和`MaxMetaspaceSize`设置成一样的值，下面介绍一个这两个参数的含义：
 
-1.MetaspaceSize：设置Metaspace扩容时触发Full GC的初始化阈值，也是最小的阈值；Metaspace由于使用不断扩容到-XX:MetaspaceSize参数指定的量，就会发生Full GC；且之后每次Metaspace扩容都可能会发生Full GC。
+1.`MetaspaceSize`：设置Metaspace扩容时触发`Full GC`的初始化阈值，也是最小的阈值；`Metaspace`由于使用不断扩容到`-XX:MetaspaceSize`参数指定的量，就会发生`Full GC`，且之后每次`Metaspace`扩容都可能会发生`Full GC`。
 
-2.MaxMetaspaceSize：设置可以分配给类元空间的最大本地内存，默认情况下大小不受限制。
+2.`MaxMetaspaceSize`：设置可以分配给类元空间的最大本地内存，默认情况下大小不受限制。
 
 综上，调大元空间的大小可以缓解类加载导致元空间OOM的问题，但无法完全避免并发和跨软引用周期导致重复加载GMA类。
 
->最佳实践：建议将MetaspaceSize和MaxMetaspaceSize设置成一样的值避免扩容，对于8G物理内存的机器来说一般建议将这两个值都设置为256M（读者可以根据实际情况调整）
+>最佳实践：建议将`MetaspaceSize`和`MaxMetaspaceSize`设置成一样的值避免扩容，对于8G物理内存的机器来说一般建议将这两个值都设置为256M（读者可以根据实际情况调整）
 
 ### 4.1.2 inflationThreshold参数
 
-JNI调用优化为GMA字节码的反射调用次数阈值可以通过参数`-Dsun.reflect.inflationThreshold`调整，因为inflationThreshold默认值是15，如果将inflationThreshold适当调大可以尽可能减少动态反射类的生成（如需关闭inflation，在Oracle JVM中没有直接关闭参数需要设置为int最大值，在IBM JVM中可以通过设置为0来关闭inflation）。但是这个动作需要谨慎，毕竟JNI的速度相对字节码还是很慢，如果应用对时间很敏感，不建议直接将inflationThreshold调为最大值，可以配合调整元空间的大小的同时将inflationThreshold调整到适当的值。
+JNI调用优化为GMA字节码的反射调用次数阈值可以通过参数`-Dsun.reflect.inflationThreshold`调整，因为`inflationThreshold`默认值是15，如果将`inflationThreshold`适当调大可以尽可能减少动态反射类的生成（如需关闭inflation，在Oracle JVM中没有直接关闭参数需要设置为int最大值，在IBM JVM中可以通过设置为0来关闭inflation）。但是这个动作需要谨慎，毕竟JNI的速度相对字节码还是很慢，如果应用对时间很敏感，不建议直接将`inflationThreshold`调为最大值，可以配合调整元空间的大小的同时将`inflationThreshold`调整到适当的值。
 
->最佳实践：默认值15，这个参数可以结合实际情况适当调大，如果要关闭inflation可以设置为`Integer.MAX_VALUE`，但关闭后会失去JIT反射性能优化，需要慎重操作
+>最佳实践：默认值15，这个参数可以结合实际情况适当调大，如果要关闭`inflation`可以设置为`Integer.MAX_VALUE`，但关闭后会失去JIT反射性能优化，需要慎重操作
 
 ### 4.1.3 noInflation参数
 
-还可以通过-Dsun.reflect.noInflation=false（默认是false）来关闭反射的优化，但仍然会有inflation机制生成字节码类。
+还可以通过`-Dsun.reflect.noInflation=false（默认是false）`来关闭反射的优化，但仍然会有inflation机制生成字节码类。
 
 >最佳实践：默认值false，一般不建议开启
 
 ### 4.1.4 SoftRefLRUPolicyMSPerMB参数
 
-笔者在实际解决问题的过程中也调整过SoftRefLRUPolicyMSPerMB参数，实际调优发现效果并没有达到预期，这里也一并说明下。软引用对象在GC的时候到底要不要被回收是通过如下的一个公式来判定的，类似一个LRU缓存策略
+笔者在实际解决问题的过程中也调整过`SoftRefLRUPolicyMSPerMB`参数，实际调优发现效果并没有达到预期，这里也一并说明下。软引用对象在GC的时候到底要不要被回收是通过如下的一个公式来判定的，类似一个LRU缓存策略
 
 `clock - timestamp <= freespace * SoftRefLRUPolicyMSPerMB`
 
-1.clock - timestamp 代表了一个软引用对象他有多久没被访问过了
+1.`clock - timestamp` 代表了一个软引用对象他有多久没被访问过了
 
-2.freespace 代表JVM中的空闲内存空间
+2.`freespace` 代表JVM中的空闲内存空间
 
-3.SoftRefLRUPolicyMSPerMB 代表每一MB空闲内存空间可以允许SoftReference对象存活多久
+3.`SoftRefLRUPolicyMSPerMB` 代表每一MB空闲内存空间可以允许SoftReference对象存活多久
 
-SoftRefLRUPolicyMSPerMB参数默认值是0所以公式的右半边是0，就导致所有的软引用对象，比如JVM生成的字节码类，刚创建出来就可能在下一次GC时被回收掉，所以也可以通过调大这个参数来降低软引用被回收的频率。
+`SoftRefLRUPolicyMSPerMB`参数默认值是0所以公式的右半边是0，就导致所有的软引用对象，比如JVM生成的字节码类，刚创建出来就可能在下一次GC时被回收掉，所以也可以通过调大这个参数来降低软引用被回收的频率。
 ![image](/img/20231222-31.jpg)
 <center style="color:gray">图31 类加载与软引用回收流程</center>
 
-```shell
--XX:SoftRefLRUPolicyMSPerMB=1000（单位：毫秒/MB）
-```
+`-XX:SoftRefLRUPolicyMSPerMB=1000（单位：毫秒/MB）`
 
-比如我们调整参数为1000，假如新生代还剩1800MB，那么软引用对象可以生存的时间实际就是1800MB * 1s/MB ≈ 30分钟
+比如我们调整参数为1000，假如新生代还剩1800MB，那么软引用对象可以生存的时间实际就是`1800MB * 1s/MB ≈ 30分钟`
 
 要注意调大这个参数只能说是缓解跨多个软引用周期导致重复加载的问题，因为设置后还是会在下一个周期回收软引用，仍然会有跨引用周期和并发生成重复类的问题无法完全避免，而且并发导致重复生成GMA也是仍然存在的。
 
->最佳实践：默认值1000毫秒，一般可将SoftRefLRUPolicyMSPerMB设为1000~10000毫秒
+>最佳实践：默认值1000毫秒，一般可将`SoftRefLRUPolicyMSPerMB`设为1000~10000毫秒
 
 ### 4.1.5 升级高版本JDK
 
@@ -412,11 +410,11 @@ SoftRefLRUPolicyMSPerMB参数默认值是0所以公式的右半边是0，就导�
 
 ## 4.2 应用实战调优
 
-4.1节提供了几种不同的JVM调优方案，笔者在应用中也有实践过，综合考虑实现成本以及B端应用对反射JNI调用额外增加的耗时（小于1ms）是可以接受的 ，实际优化方案是采取在JVM参数中增加 -Dsun.reflect.inflationThreshold=2147483647 参数来彻底关闭inflation机制，调整后效果如图33
+4.1节提供了几种不同的JVM调优方案，笔者在应用中也有实践过，综合考虑实现成本以及B端应用对反射JNI调用额外增加的耗时（小于1ms）是可以接受的 ，实际优化方案是采取在JVM参数中增加 `-Dsun.reflect.inflationThreshold=2147483647` 参数来彻底关闭inflation机制，调整后效果如图33
 ![image](/img/20231222-32.jpg)
 <center style="color:gray">图32 应用调优后的类加载情况</center>
 
-可以明显地观察到调整后类加载的速度放缓了，笔者的应用是对RT不太敏感的，如果对RT敏感的应用需要适当地调大元空间大小和inflationThreshold的值。举个例子，比如笔者的应用也可以调整为
+可以明显地观察到调整后类加载的速度放缓了，笔者的应用是对RT不太敏感的，如果对RT敏感的应用需要适当地调大元空间大小和`inflationThreshold`的值。举个例子，比如笔者的应用也可以调整为
 
 ```shell
 -XX:MaxMetaspaceSize=512m  
@@ -438,19 +436,19 @@ SoftRefLRUPolicyMSPerMB参数默认值是0所以公式的右半边是0，就导�
 
 ### JDK 11中的反射类相关加载
 
-在JDK11中仍然存在并发安全和软引用回收的问题，NativeMethodAccessorImpl的invoke()方法中，判定inflation机制的地方仍然未加同步机制，在并发环境下仍会重复生成GMA类
+在JDK11中仍然存在并发安全和软引用回收的问题，`NativeMethodAccessorImpl`的`invoke()`方法中，判定inflation机制的地方仍然未加同步机制，在并发环境下仍会重复生成GMA类
 ![image](/img/20231222-34.jpg)
 <center style="color:gray">图34</center>
 
 ### JDK 17中的反射类相关加载
 
-在JDK17中通过CAS来避免多线程重复生成，可以看到在标红1处判断是否已生成GMA的标记generated==0，然后紧接着使用CAS将generated置为1，那么后面的反射调用执行到标红1处自然判定为false就不会进入GMA类的生成代码里了，CAS解决了并发线程安全的问题，在并发环境下最多生成一个GMA类，但仍然没有解决软引用周期的问题。如果读者是使用的JDK 17版本碰到重复加载的问题，可以考虑从软引用周期入手，通过调整`SoftRefLRUPolicyMSPerMB`来控制软引用回收频率，也可以适当调大-`Dsun.reflect.inflationThreshold`来降低生成GMA的频率
+在JDK17中通过CAS来避免多线程重复生成，可以看到在标红1处判断是否已生成GMA的标记`generated==0`，然后紧接着使用CAS将generated置为1，那么后面的反射调用执行到标红1处自然判定为false就不会进入GMA类的生成代码里了，CAS解决了并发线程安全的问题，在并发环境下最多生成一个GMA类，但仍然没有解决软引用周期的问题。如果读者是使用的JDK 17版本碰到重复加载的问题，可以考虑从软引用周期入手，通过调整`SoftRefLRUPolicyMSPerMB`来控制软引用回收频率，也可以适当调大-`Dsun.reflect.inflationThreshold`来降低生成GMA的频率
 ![image](/img/20231222-35.jpg)
 <center style="color:gray">图35</center>
 
 ### JDK 21中的反射类相关加载
 
-在JDK21中新引入了DirectMethodHandleAccessor也是MethodAccessor的一种实现，在前文提到`sun.reflect.ReflectionFactory#newMethodAccessor`方法生成MethodAccessor的地方（图36）可以看到，通过`jdk.internal.reflect.ReflectionFactory#useMethodHandleAccessor`来判断是否使用新的实现类（默认实现类，详见图37），同时也兼容了低版本的NativeMethodAccessorImpl实现，可以通过参数-Djdk.reflect.useDirectMethodHandle来控制默认实现类方式（图37标红4），如果置为false就仍会走到NativeMethodAccessorImpl的实现中DirectMethodHandleAccessor默认实现就是JNI调用（图38），从根本上避免了GMA类的生成。
+在JDK21中新引入了`DirectMethodHandleAccessor`也是`MethodAccessor`的一种实现，在前文提到`sun.reflect.ReflectionFactory#newMethodAccessor`方法生成`MethodAccessor`的地方（图36）可以看到，通过`jdk.internal.reflect.ReflectionFactory#useMethodHandleAccessor`来判断是否使用新的实现类（默认实现类，详见图37），同时也兼容了低版本的NativeMethodAccessorImpl实现，可以通过参数`-Djdk.reflect.useDirectMethodHandle`来控制默认实现类方式（图37标红4），如果置为false就仍会走到`NativeMethodAccessorImpl`的实现中`DirectMethodHandleAccessor`默认实现就是JNI调用（图38），从根本上避免了GMA类的生成。
 ![image](/img/20231222-36.jpg)
 <center style="color:gray">图36</center>
 ![image](/img/20231222-37.jpg)
@@ -466,7 +464,7 @@ SoftRefLRUPolicyMSPerMB参数默认值是0所以公式的右半边是0，就导�
 
 笔者团队的一个应用从JDK 7升级到JDK 8后，每次JVM重启都会有两次FullGC会触发告警，虽然不影响后续对外提供服务，但每次重启必现告警也确实十分恼人。
 
-可以通过java命令（java -XX:+PrintFlagsFinal -version | grep  Meta）查看java进程的元空间大小发现元空间大小不到21MB，继续检查JVM参数发现是因为升级JDK 8后没有指定-XX:MetaspaceSize和-XX:MaxMetaspaceSize参数，所以元空间默认大小就是不到21MB，在JVM启动过程中加载类会进行元空间扩容，元空间扩容前会触发Full GC，因为有两次扩容所以会触发两次Full GC。
+可以通过java命令`（java -XX:+PrintFlagsFinal -version | grep  Meta）`查看java进程的元空间大小发现元空间大小不到21MB，继续检查JVM参数发现是因为升级JDK 8后没有指定`-XX:MetaspaceSize`和`-XX:MaxMetaspaceSize`参数，所以元空间默认大小就是不到21MB，在JVM启动过程中加载类会进行元空间扩容，元空间扩容前会触发`Full GC`，因为有两次扩容所以会触发两次`Full GC`。
 
 ```shell
 [localhost ~]$ java -XX:+PrintFlagsFinal -version | grep  Meta
@@ -498,21 +496,19 @@ Java HotSpot(TM) 64-Bit Server VM (build 25.45-b02, mixed mode)
 
 ## 5.2 持续类加载导致元空间OOM的另一种场景
 
-从 JDK 8 开始，Nashorn取代Rhino(JDK 6, JDK 7) 成为 Java 的嵌入式 JavaScript 引擎。Nashorn 完全支持 ECMAScript 5.1 规范以及一些扩展。它使用基于 JSR 292 的新语言特性，其中包含在 JDK 7 中引入的 invokedynamic，将 JavaScript 编译成 Java 字节码。与先前的 Rhino 实现相比，这带来了2到10倍的性能提升。
+从 JDK 8 开始，`Nashorn`取代`Rhino(JDK 6, JDK 7) `成为 Java 的嵌入式 JavaScript 引擎。Nashorn 完全支持 ECMAScript 5.1 规范以及一些扩展。它使用基于 JSR 292 的新语言特性，其中包含在 JDK 7 中引入的 invokedynamic，将 JavaScript 编译成 Java 字节码。与先前的 Rhino 实现相比，这带来了2到10倍的性能提升。
 
 笔者团队的另一个项目中使用了Nashorn包的JavaScript脚本执行能力做数据监控的规则判定，线上每隔一段时间就会触发元空间OOM告警，需要手动重启才能恢复。
 
 有了我们之前的经验，我们在分析时直接看类加载的日志统计加载最多的类，然后结合业务代码和源码逐步断点排查，基本就能定位到根因了。在排查类加载中发现是有大量的类被加载。
 
-```shell
-[Loaded jdk.nashorn.internal.scripts.Script$1474$\^eval\_ from __JVM_DefineClass__]
-```
+`[Loaded jdk.nashorn.internal.scripts.Script$1474$\^eval\_ from __JVM_DefineClass__]`
 
 这里大概解释一下现象：Nashorn引擎本身会判断表达式是否已经编译过，如果没有编译过就会重新编译一次表达式，编译时会加载一个Script的类，判断表达式是否编译过是根据表达式的字符串来匹配的，所以当表达式不一样时就会重新编译表达式。以为表达式用到了大量的变量替换所以替换后的表达式大多都不一致，会重复加载Script类最终导致MetaSpace占满，触发频繁的Full GC。
 ![image](/img/20231222-39.jpg)
 <center style="color:gray">图39 表达式相关Script类的生成</center>
 
-举个例子，表达式为：${BrandId}>0 || ${shopId}>0那么当门店shopId不同时，表达式就可能为：${12345}>0 || ${222222}>0 或 ${12345}>0 || ${333333}>0，那么这两个就是不同的表达式，会被编译两次加载两个Script类，所以框架每次执行新请求时都可能会生成新的类。最终导致元空间内存溢出OOM。
+举个例子，表达式为：`${BrandId}>0 || ${shopId}>0`那么当门店shopId不同时，表达式就可能为：`${12345}>0 || ${222222}>0 或 ${12345}>0 || ${333333}>0`，那么这两个就是不同的表达式，会被编译两次加载两个Script类，所以框架每次执行新请求时都可能会生成新的类。最终导致元空间内存溢出OOM。
 
 查阅了文档后发现Nashorn还有一种参数绑定的调用形式，可以只编译原始表达式（1次）通过把动态参数传入框架做匹配，这样同一个表达式就不会被编译多次，频繁类加载问题也迎刃而解了。
 
@@ -548,7 +544,7 @@ JDK 8的元空间的默认初始大小只有20.75MB（64位JVM），注意元空
 
 ## 6.5 研究方向
 
-目前网上关于JDK 21的资料比较少，后续继续研究下JDK 21下DirectMethodHandleAccessor的实现，看下在默认JNI调用下如何实现更好的性能，对这部分感兴趣的同学可以参考：method handles
+目前网上关于JDK 21的资料比较少，后续继续研究下JDK 21下`DirectMethodHandleAccessor`的实现，看下在默认JNI调用下如何实现更好的性能，对这部分感兴趣的同学可以参考：[method handles](https://blogs.oracle.com/javamagazine/post/java-reflection-method-handles)
 
 # 7 参考文献
 1.[R大-关于反射调用方法的一个log](https://blog.csdn.net/rednaxelafx/article/details/83517409)
