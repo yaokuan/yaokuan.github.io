@@ -33,13 +33,13 @@ tags:       Java 反射 类加载 JDK 元空间 OOM 软引用 并发线程安全
 
 ## 2.2 元空间介绍
 
-元空间是JDK 8才出现的概念，在JDK 8之前叫做永久代，它们都属于方法区，元空间、永久代、方法区看似同一个东西实际又有所区别。方法区是Java虚拟机的一个规范，所有虚拟机的实现都必须遵循规范，常见的虚拟机如HotSpot、JRockit（Oracle）、J9（IBM）都有对方法区不同的实现。我们通常使用的JDK都是由Sun JDK和OpenJDK所提供的，这也是应用最广泛的版本，而该版本使用的VM就是HotSpot VM，所以我们一般讨论就限定在HotSpot VM的范围。而元空间和永久代是HotSpot VM对方法区不同的具体实现，其区别包括：
+元空间是JDK 8才出现的概念，在JDK 8之前叫做永久代，它们都属于方法区，元空间、永久代、方法区看似同一个东西实际又有所区别。方法区是Java虚拟机的一个规范，所有虚拟机的实现都必须遵循规范，常见的虚拟机如`HotSpot`、`JRockit（Oracle）`、`J9（IBM）`都有对方法区不同的实现。我们通常使用的JDK都是由`Sun JDK`和`OpenJDK`所提供的，这也是应用最广泛的版本，而该版本使用的VM就是`HotSpot VM`，所以我们一般讨论就限定在`HotSpot VM`的范围。而元空间和永久代是`HotSpot VM`对方法区不同的具体实现，其区别包括：
 
 实现版本不同。永久代是JDK 7之前的实现，元空间是JDK 8及之后的实现。
 
 存储位置不同。永久代占用虚拟机分配的内存，图2中看永久代和堆是连在一起的，表明这两块空间在物理内存上是连续的，但在逻辑上是独立的，而元空间使用本地内存不受虚拟机内存限制，和堆内存在物理内存上不连续了。
 
-存储内容不同。永久代存储类信息、字面量、类静态变量和符号引用，而元空间只存储类信息，实际上移除永久代的工作从JDK 7就开始了，符号引用转移到了Native heap，字面量和类静态变量转移到了Java heap。
+存储内容不同。永久代存储类信息、字面量、类静态变量和符号引用，而元空间只存储类信息，实际上移除永久代的工作从JDK 7就开始了，符号引用转移到了`Native heap`，字面量和类静态变量转移到了`Java heap`。
 
 ![image](/img/20231222-2.jpg)
 <center style="color:gray">图2 元空间和永久代的区别</center>
@@ -52,19 +52,17 @@ tags:       Java 反射 类加载 JDK 元空间 OOM 软引用 并发线程安全
 
 永久代会为GC带来不必要的复杂度，并且回收效率偏低。
 
-JDK 8实际上是HotSpot与JRockit合并的，只是产品名字还是叫HotSpot VM，合并就需要移除HotSpot特有的永久代，新引入元空间给新的HotSpot VM。
+JDK 8实际上是`HotSpot`与`JRockit`合并的，只是产品名字还是叫`HotSpot VM`，合并就需要移除HotSpot特有的永久代，新引入元空间给新的`HotSpot VM`。
 
 ## 2.3 元空间OOM问题初次分析
 
-那我们知道元空间主要就是存储类信息，再结合从2.1节观察 `jvm.classloading.loaded.count`  指标的增长趋势，我们基本可以判断这次元空间OOM是因为有频繁的类加载行为，我们可以理解在应用启动时会有类加载，但为什么应用在运行时还会加载这么多类需要重点排查下，JVM可以打印类加载和卸载的日志，需要添加下面的参数
+那我们知道元空间主要就是存储类信息，再结合从2.1节观察 `jvm.classloading.loaded.count` 指标的增长趋势，我们基本可以判断这次元空间OOM是因为有频繁的类加载行为，我们可以理解在应用启动时会有类加载，但为什么应用在运行时还会加载这么多类需要重点排查下，JVM可以打印类加载和卸载的日志，需要添加下面的参数
 
-```shell
--XX:+UnlockDiagnosticVMOptions 允许查看Metaspace加载的类信息和元信息使用情况
+- `-XX:+UnlockDiagnosticVMOptions` 允许查看Metaspace加载的类信息和元信息使用情况
 
--XX:+TraceClassUnloading -XX:+TraceClassLoading 打印JVM类加载和卸载的信息
-```
-
-添加参数重启应用后查看日志可以发现在应用运行中仍有大量类似sun.reflect.GeneratedMethodAccessor的类被加载
+- `-XX:+TraceClassUnloading -XX:+TraceClassLoading` 打印JVM类加载和卸载的信息
+- 
+添加参数重启应用后查看日志可以发现在应用运行中仍有大量类似`sun.reflect.GeneratedMethodAccessor`的类被加载
 
 ```shell
 ...此处省略10000条
@@ -72,7 +70,7 @@ JDK 8实际上是HotSpot与JRockit合并的，只是产品名字还是叫HotSpot
 ...
 ```
 
-看类的命名能知道是JDK中自带的类，虽然在JDK源码中搜不到这个类（3.1.2小节会解释为什么搜不到），但通过sun.reflect这个包名我们也能大概猜到这是和反射相关的类，但不知道是哪里用到了反射，为了进一步分析就需要借助反编译工具
+看类的命名能知道是JDK中自带的类，虽然在JDK源码中搜不到这个类（3.1.2小节会解释为什么搜不到），但通过`sun.reflect`这个包名我们也能大概猜到这是和反射相关的类，但不知道是哪里用到了反射，为了进一步分析就需要借助反编译工具
 
 ### 2.3.1 通过反编译工具分析大量加载类的来源
 
@@ -87,8 +85,8 @@ JDK 8实际上是HotSpot与JRockit合并的，只是产品名字还是叫HotSpot
 但为什么类持续在加载却并没有看到大量类卸载的日志，而且元空间占用也是随着类加载趋势一直在上涨。这里思考一下为什么加载的这些类不能被回收？我们知道类被回收需要满足下面三个条件，因为反射是由应用类加载器加载，很明显下面的第2点就不满足，所以反射过程中动态加载的这些类无法被回收，类加载数量持续增长。
 1.该类所有的实例都已经被回收，也就是java堆中不存在该类的任何实例。
 2.加载该类的ClassLoader已经被回收（双亲委派机制，判断两个类相同的前提是加载类的classLoader相同）。
-3.该类对应的java.lang.Class对象没有任何地方被引用，无法在任何地方通过反射访问该类的方法。
-为了进一步分析这些GeneratedMethodAccessor类是在哪里反射调用的，我们借助开源工具dumpclass下载这些类再通过反编译可以获取更多详细的信息
+3.该类对应的`java.lang.Class`对象没有任何地方被引用，无法在任何地方通过反射访问该类的方法。
+为了进一步分析这些`GeneratedMethodAccessor`类是在哪里反射调用的，我们借助开源工具dumpclass下载这些类再通过反编译可以获取更多详细的信息
 
 ```shell
 #下载dumpClass的jar包
@@ -103,24 +101,24 @@ cd /sun/reflectsun.reflect.GeneratedMethodAccessor*
 javap -verbose GeneratedMethodAccessor999
 ```
 
-查看反编译class文件找到反射执行的位置（在class文件中找到invokevirtual关键字，对应的路径则为反射生成GeneratedMethodAccessor的业务代码）进行分析发现大量调用来源于业务中bean的Getter/Setter方法，通过脚本统计反编译类的invokevirtual属性发现存在同一个Getter方法生成多个GeneratedMethodAccessor的情况。
+查看反编译class文件找到反射执行的位置（在class文件中找到`invokevirtual`关键字，对应的路径则为反射生成`GeneratedMethodAccessor`的业务代码）进行分析发现大量调用来源于业务中bean的`Getter/Setter`方法，通过脚本统计反编译类的`invokevirtual`属性发现存在同一个Getter方法生成多个`GeneratedMethodAccessor`的情况。
 ![image](/img/20231222-3.jpg)
 <center style="color:gray">图3 反编译字节码类查看业务调用源头</center>
 
 ### 2.3.2 初步问题分析的结论引出重复类加载的疑点
 
-所以关于频繁的GeneratedMethodAccessor类加载我们初步得出下面几个结论：
-1.生成的GeneratedMethodAccessor类大多是正常业务代码相关的，各种类都有并没有某一特定Getter/Setter方法生成大量的GeneratedMethodAccessor类。
-2.同一个业务类的Getter/Setter方法存在生成多个GeneratedMethodAccessor类的情况，也就是可能会出现重复加载GeneratedMethodAccessor类的情况。
+所以关于频繁的`GeneratedMethodAccessor`类加载我们初步得出下面几个结论：
+1.生成的`GeneratedMethodAccessor`类大多是正常业务代码相关的，各种类都有并没有某一特定Getter/Setter方法生成大量的`GeneratedMethodAccessor`类。
+2.同一个业务类的Getter/Setter方法存在生成多个`GeneratedMethodAccessor`类的情况，也就是可能会出现重复加载`GeneratedMethodAccessor`类的情况。
 第2点结论比较反直觉，我们一般认为对于某个反射方法已经是非常明确的了，所生成的字节码类应该只有唯一的一个且是可以复用的，如果是这样的话因为业务类的数量是固定的，那么对应反射方法的动态类加载数量理论上也应该是固定的。但实际上反射相关的类是持续增长且有重复加载的现象，也正是因为重复加载才会出现类数量持续增加最终导致元空间OOM的情况。所以为什么会出现重复加载的情况应该是问题的关键，我们带着疑问继续往下看。
 
 # 3 初识反射相关类GeneratedMethodAccessor（GMA）
 
-注：以下内容提到的GMA为GeneratedMethodAccessor类的缩写
+**注：以下内容提到的GMA为GeneratedMethodAccessor类的缩写**
 
 ## 3.1 了解反射执行过程及GMA类在反射中的作用
 
-首先我们需要了解反射调用执行大概的过程，先看一个简单的反射例子，下面是通过反射调用拿到了person的id，首先要通过Person类获取对应的getId方法，然后执行对应的反射方法method.invoke()。
+首先我们需要了解反射调用执行大概的过程，先看一个简单的反射例子，下面是通过反射调用拿到了person的id，首先要通过Person类获取对应的getId方法，然后执行对应的反射方法`method.invoke()`。
 
 ![image](/img/20231222-4.jpg)
 <center style="color:gray">图4 一个反射例子</center>
@@ -132,19 +130,19 @@ javap -verbose GeneratedMethodAccessor999
 
 ### 3.1.1 通过Class如何获取反射方法
 
-我们先来看下是怎么找到方法的，顺着`java.lang.Class#getMethod`往下会发现查找方法都会走到`java.lang.Class#privateGetDeclaredMethods`内部，publicOnly参数是用来控制是否只返回声明为public的方法，这里以图4为例publicOnly参数为true，对应返回declaredPublicMethods，方法内会首先判断ReflectionData是否为空，这是一个Class内部的软引用相当于本地缓存的作用，图6标红第3处会判断缓存内部的declaredPublicMethods是否为空，如果缓存内非空优先返回缓存内的，否则调用JNI获取类声明的public方法并放入缓存中。
+我们先来看下是怎么找到方法的，顺着`java.lang.Class#getMethod`往下会发现查找方法都会走到`java.lang.Class#privateGetDeclaredMethods`内部，`publicOnly`参数是用来控制是否只返回声明为public的方法，这里以图4为例publicOnly参数为true，对应返回`declaredPublicMethods`，方法内会首先判断`ReflectionData`是否为空，这是一个Class内部的软引用相当于本地缓存的作用，图6标红第3处会判断缓存内部的`declaredPublicMethods`是否为空，如果缓存内非空优先返回缓存内的，否则调用JNI获取类声明的public方法并放入缓存中。
 
 ![image](/img/20231222-6.jpg)
 <center style="color:gray">图6 获取Class内的Method</center>
 
-再看下方法的缓存是在`java.lang.Class#reflectionData`方法获取的，前面有提到reflectionData相当于本地缓存（图7标红1处是在Class内部声明为软引用的局部变量），软引用常被用来当做缓存使用是因为其特殊的回收机制（3.2.3小节有介绍）。useCaches参数初始化为true，在图7标红3处可以通过系统变量`-Dsun.reflect.noCaches`关闭，所以默认开启缓存并返回缓存对象（不存在则新建一个空缓存返回）。
+再看下方法的缓存是在`java.lang.Class#reflectionData`方法获取的，前面有提到`reflectionData`相当于本地缓存（图7标红1处是在Class内部声明为软引用的局部变量），软引用常被用来当做缓存使用是因为其特殊的回收机制（3.2.3小节有介绍）。useCaches参数初始化为true，在图7标红3处可以通过系统变量`-Dsun.reflect.noCaches`关闭，所以默认开启缓存并返回缓存对象（不存在则新建一个空缓存返回）。
 
 ![image](/img/20231222-7.jpg)
 <center style="color:gray">图7 Class内软引用的使用</center>
 
 通过上面的步骤就找到了Class声明的所有public方法，之后就要从中找到我们需要的那一个，在`java.lang.Class#searchMethods`方法中会通过方法名找到完全匹配的方法Method，然后在图8标红2处复制一个Method对象返回，复制过程使用的是`java.lang.reflect.Method#copy`方法，关于Method的复制我们后面还会再提到，这里只要暂时先知道方法的复制会深拷贝一个Method对象返回即可。至于为什么要每次进行拷贝而不能直接用找到的method呢？笔者认为这里至少有两个原因
 
-因为同一个方法的不同实例化对象中，虽然大部分属性都相同，如方法名、入参、返回值等，但有一个属性是不同的，它就是 override 属性默认为 false，控制是否能够访问私有方法，如果当前方法对象是私有方法，默认是不可访问的，可以通过 setAccessible(true) 进行修改 ，复制是为了避免对原方法override的修改。
+因为同一个方法的不同实例化对象中，虽然大部分属性都相同，如方法名、入参、返回值等，但有一个属性是不同的，它就是 override 属性默认为 false，控制是否能够访问私有方法，如果当前方法对象是私有方法，默认是不可访问的，可以通过 `setAccessible(true)` 进行修改 ，复制是为了避免对原方法override的修改。
 
 原有的method是一个全局变量，如果直接使用了原有的method，可能会对该method有一定的修改，该method会被多个线程使用，从而导致某个线程某处对method修改后，对别的线程产生影响，getMethod方法每次都会copy出一个新的副本method，可以减少同一线程内和不同线程间method修改产生的影响。
 
@@ -157,24 +155,24 @@ javap -verbose GeneratedMethodAccessor999
 
 #### 3.1.2.1 获取MethodAccessor流程分析
 
-`java.lang.reflect.Method#invoke`方法是反射执行调用的关键，在图9标红1可以看到invoke()内部声明了一个局部变量ma它是MethodAccessor接口的一个实例化对象，而MethodAccessor接口定义了反射具体行为，Method.invoke的真正逻辑在图9标红3处的 
-ma.invoke(obj, args)中，因为实际执行逻辑是委托给MethodAccessor进行的，所以这里我们首先要搞清楚MethodAccessor是如何生成的以及如何利用MethodAccessor来执行反射调用。
+`java.lang.reflect.Method#invoke`方法是反射执行调用的关键，在图9标红1可以看到invoke()内部声明了一个局部变量ma它是MethodAccessor接口的一个实例化对象，而MethodAccessor接口定义了反射具体行为，`Method.invoke`的真正逻辑在图9标红3处的 
+`ma.invoke(obj, args)`中，因为实际执行逻辑是委托给MethodAccessor进行的，所以这里我们首先要搞清楚MethodAccessor是如何生成的以及如何利用MethodAccessor来执行反射调用。
 
 ![image](/img/20231222-9.jpg)
 <center style="color:gray">图9 invoke方法的流程</center>
 
-在图9标红2处可以看到获取MethodAccessor实例并赋值给ma，进入acquireMethodAccessor()方法内部，在图10中有明确的if...else两条代码分支，明确了两种不同的MethodAccessor实现，这两种实现都非常重要。if内部是复用root的MethodAccessor，root是Method内的局部变量（图10标红5），类型也是Method，前面有提到我们获取的Method对象都是深拷贝的，这个root就是指向的原Method对象，而else内部是新建MethodAccessor的方式。前面图6标红2的JNI调用获取的Method的methodAccessor默认值是null的，Method的methodAccessor变量被设计成懒加载的（图10标红4），笔者推测这是因为虚拟机不知道方法何时被反射调用，所以为了节省内存开销设计成了懒加载。所以默认第一次反射调用会进入到图10标红2执行新建流程。
+在图9标红2处可以看到获取MethodAccessor实例并赋值给ma，进入acquireMethodAccessor()方法内部，在图10中有明确的`if...else`两条代码分支，明确了两种不同的MethodAccessor实现，这两种实现都非常重要。if内部是复用root的MethodAccessor，root是Method内的局部变量（图10标红5），类型也是Method，前面有提到我们获取的Method对象都是深拷贝的，这个root就是指向的原Method对象，而else内部是新建MethodAccessor的方式。前面图6标红2的JNI调用获取的Method的methodAccessor默认值是null的，Method的methodAccessor变量被设计成懒加载的（图10标红4），笔者推测这是因为虚拟机不知道方法何时被反射调用，所以为了节省内存开销设计成了懒加载。所以默认第一次反射调用会进入到图10标红2执行新建流程。
 
 ![image](/img/20231222-10.jpg)
 <center style="color:gray">图10 获取和生成MethodAccessor流程</center>
 
 先看下新建流程里，会通过`sun.reflect.ReflectionFactory#newMethodAccessor`去创建methodAccessor对象，图11中有两个条件来控制使用哪种方式创建MethodAccessor对象
 
-1. noInflation。是否关闭inflation机制[^1]，默认情况下noInflation为false，若设置为true则始终使用字节码方式生成GMA（可通过JVM参数 `-Dsun.reflect.noinflation`来设置）。
+1. `noInflation`。是否关闭inflation机制[^1]，默认情况下noInflation为false，若设置为true则始终使用字节码方式生成GMA（可通过JVM参数 `-Dsun.reflect.noinflation`来设置）。
 
-2. !ReflectUtil.isVMAnonymousClass。这个条件是判断方法所属的类非匿名类，因为匿名类不支持字节码的方式，同样的判定条件在NativeMethodAccessorImpl也有原因详见注释（图12）。
+2. `!ReflectUtil.isVMAnonymousClass`。这个条件是判断方法所属的类非匿名类，因为匿名类不支持字节码的方式，同样的判定条件在NativeMethodAccessorImpl也有原因详见注释（图12）。
 
-因为noInflation参数默认为false，会进入到else内部生成NativeMethodAccessorImpl对象并给DelegatingMethodAccessorImpl代理执行。
+因为noInflation参数默认为false，会进入到else内部生成`NativeMethodAccessorImpl`对象并给`DelegatingMethodAccessorImpl`代理执行。
 
 ![image](/img/20231222-11.jpg)
 <center style="color:gray">图11 新建methodAccessor流程</center>
@@ -183,9 +181,9 @@ ma.invoke(obj, args)中，因为实际执行逻辑是委托给MethodAccessor进�
 
 #### 3.1.2.2 关于MethodAccessor接口和它的实现类
 
-MethodAccessor接口定义了反射主要的行为，图11中可以看到 NativeMethodAccessorImpl（本地方法调用类）交给了DelegatingMethodAccessorImpl（代理类）代理执行，除这两种外还有 MethodAccessorImpl（抽象实现类）和GeneratedMethodAccessor[^2]（字节码类）。我们会发现在JDK源码中根本找不到GeneratedMethodAccessor这个类，是因为这是ASM字节码生成的类，看源码字节码生成方法返回的是MagicAccessorImpl，这是个什么类？
+`MethodAccessor`接口定义了反射主要的行为，图11中可以看到 `NativeMethodAccessorImpl`（本地方法调用类）交给了`DelegatingMethodAccessorImpl`（代理类）代理执行，除这两种外还有 `MethodAccessorImpl`（抽象实现类）和`GeneratedMethodAccessor`[^2]（字节码类）。我们会发现在JDK源码中根本找不到`GeneratedMethodAccessor`这个类，是因为这是ASM字节码生成的类，看源码字节码生成方法返回的是`MagicAccessorImpl`，这是个什么类？
 
-原本Java的安全机制使得不同类之间不是任意信息都可见，但JDK里面专门设了个MagicAccessorImpl标记类开了个后门来允许不同类之间信息可以互相访问（由JVM管理），所以MethodAccessorImpl类继承MagicAccessorImpl类后可以访问字节码生成的GeneratedMethodAccessor类信息。
+原本Java的安全机制使得不同类之间不是任意信息都可见，但JDK里面专门设了个`MagicAccessorImpl`标记类开了个后门来允许不同类之间信息可以互相访问（由JVM管理），所以`MethodAccessorImpl`类继承`MagicAccessorImpl`类后可以访问字节码生成的`GeneratedMethodAccessor`类信息。
 
 ```java
 /* <P> MagicAccessorImpl (named for parity with FieldAccessorImpl and
@@ -207,23 +205,23 @@ class MagicAccessorImpl {
 }
 ```
 
-所以再来看一下图13的UML，我们可以知道MethodAccessor接口有native和字节码两种具体实现类，并使用代理模式（将NativeMethodAccessorImpl和GeneratedMethodAccessor交给DelegatingMethodAccessorImpl统一进行代理）进行调用，DelegatingMethodAccessorImpl只负责转发，实际负责执行的是NativeMethodAccessorImpl和GeneratedMethodAccessor。
+所以再来看一下图13的UML，我们可以知道`MethodAccessor`接口有native和字节码两种具体实现类，并使用代理模式（将`NativeMethodAccessorImpl`和`GeneratedMethodAccessor`交给`DelegatingMethodAccessorImpl`统一进行代理）进行调用，`DelegatingMethodAccessorImpl`只负责转发，实际负责执行的是`NativeMethodAccessorImpl`和`GeneratedMethodAccessor`。
 ![image](/img/20231222-13.jpg)
 <center style="color:gray">图13 MethodAccessor接口UML</center>
 
-生成完NativeMethodAccessorImpl和DelegatingMethodAccessorImpl后，就会将新生成的methodAccessor赋值给Method并同步赋值给root（图10标红3），`java.lang.reflect.Method#methodAccessor`被声明为volatile的，这样只要有一处设置过就可以实现methodAccessor的复用了。
+生成完`NativeMethodAccessorImpl`和`DelegatingMethodAccessorImpl`后，就会将新生成的methodAccessor赋值给Method并同步赋值给root（图10标红3），`java.lang.reflect.Method#methodAccessor`被声明为volatile的，这样只要有一处设置过就可以实现methodAccessor的复用了。
 ![image](/img/20231222-14.jpg)
 <center style="color:gray">图14 设置root复用methodAccessor</center>
 
-那么下一次反射调用执行时，看图10标红1处的root是Method内部声明的一个Method类型的局部变量，在前面图7标红5处我们有提到获取的方法都是通过Method.copy()复制的，再看图15标红1在复制时会先深拷贝Method原对象生成一个Method新对象（包括方法名、参数、返回值等），图15标红2处新对象的root是一个到原对象的引用，然后图15标红3处复用原对象的methodAccessor对象（图10的root声明的注释也有强调说明root的存在是为了复用methodAccessor对象）。所以图10标红1这里当root不为null时就直接复用root的methodAccessor返回，不需要重新创建MethodAccessor。所以可以理解之后所有获取的Method新对象的root都是指向原对象，那么methodAccessor也是原对象的methodAccessor，都是同一个methodAccessor对象。
+那么下一次反射调用执行时，看图10标红1处的root是Method内部声明的一个Method类型的局部变量，在前面图7标红5处我们有提到获取的方法都是通过`Method.copy()`复制的，再看图15标红1在复制时会先深拷贝Method原对象生成一个Method新对象（包括方法名、参数、返回值等），图15标红2处新对象的root是一个到原对象的引用，然后图15标红3处复用原对象的methodAccessor对象（图10的root声明的注释也有强调说明root的存在是为了复用methodAccessor对象）。所以图10标红1这里当root不为null时就直接复用root的methodAccessor返回，不需要重新创建MethodAccessor。所以可以理解之后所有获取的Method新对象的root都是指向原对象，那么methodAccessor也是原对象的methodAccessor，都是同一个methodAccessor对象。
 ![image](/img/20231222-15.jpg)
 <center style="color:gray">图15 复制Method的流程</center>
 
 #### 3.1.2.3 分析MethodAccessor的执行过程
 
-到这里我们就获取到MethodAccessor了，前面提到初次返回的是DelegatingMethodAccessorImpl的实例，它是对NativeMethodAccessorImpl实现类的代理，所以在method.invoke()内执行的反射调用最终是交给NativeMethodAccessorImpl执行，图16的标红的几点都比较重要，我们按标红序号展开来说一下。
+到这里我们就获取到`MethodAccessor`了，前面提到初次返回的是`DelegatingMethodAccessorImpl`的实例，它是对`NativeMethodAccessorImpl`实现类的代理，所以在`method.invoke()`内执行的反射调用最终是交给`NativeMethodAccessorImpl`执行，图16的标红的几点都比较重要，我们按标红序号展开来说一下。
 
-这里是DelegatingMethodAccessorImpl的部分实现，代理类此时是对NativeMethodAccessorImpl的代理，所以这里的delegate是NativeMethodAccessorImpl的实现，最终会由NativeMethodAccessorImpl来执行反射调用。
+这里是`DelegatingMethodAccessorImpl`的部分实现，代理类此时是对`NativeMethodAccessorImpl`的代理，所以这里的delegate是`NativeMethodAccessorImpl`的实现，最终会由`NativeMethodAccessorImpl`来执行反射调用。
 
 反射执行过程中会判断`++numInvocations > ReflectionFactory.inflationThreshold()`，阈值inflationThreshold是根据JVM启动时 `-Dsun.reflect.inflationThreshold` 参数进行设置的，默认值是15，关于这个判断阈值的机制我们后面会详细展开，这里暂时只需要了解到阈值才会进入生成GMA的流程中。
 
