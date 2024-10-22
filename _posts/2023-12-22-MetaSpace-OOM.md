@@ -251,34 +251,37 @@ class MagicAccessorImpl {
 
 ### 3.2.1 反射调用膨胀机制（inflation机制）
 
-Java虚拟机会首先使用JNI存取器，然后在访问了同一个类若干次后，会改为使用Java字节码存取器。 这种当Java虚拟机从JNI存取器改为字节码存取器的行为被称为膨胀（Inflation）
+Java虚拟机会首先使用JNI存取器，然后在访问了同一个类若干次后，会改为使用Java字节码存取器。 这种当Java虚拟机从JNI存取器改为字节码存取器的行为被称为膨胀`Inflation`
 
 前面我们提到跟GMA类生成相关的地方有两处，而这两处都有inflation机制相关的参数来控制。
 
-noInflation参数，在`sun.reflect.ReflectionFactory#newMethodAccessor`处
+1.`noInflation`参数，在`sun.reflect.ReflectionFactory#newMethodAccessor`处
 
-这个方法是创建MethodAccessor对象，通过noInflation参数控制实现方式，如果该参数为true则在newMethodAccessor方法中就通过字节码会直接创建GMA类来实现invoke方法，如果为false就会走默认的DelegatingMethodAccessorImpl代理NativeMethodAccessorImpl实现类。因为参数noInflation默认为false（可通过-Dsun.reflect.noinflation进行设置参考图20）所以默认这里不会生成GMA类。
+这个方法是创建`MethodAccessor`对象，通过`noInflation`参数控制实现方式，如果该参数为true则在`newMethodAccessor`方法中就通过字节码会直接创建GMA类来实现invoke方法，如果为false就会走默认的`DelegatingMethodAccessorImpl`代理`NativeMethodAccessorImpl`实现类。因为参数`noInflation`默认为false（可通过`-Dsun.reflect.noinflation`进行设置参考图20）所以默认这里不会生成GMA类。
 ![image](/img/20231222-19.jpg)
 <center style="color:gray">图19</center>
 
-inflationThreshold参数，在`sun.reflect.NativeMethodAccessorImpl#invoke`处
+2.`inflationThreshold`参数，在`sun.reflect.NativeMethodAccessorImpl#invoke`处
 
-这个方法是NativeMethodAccessorImpl实现反射调用的相关代码，inflationThreshold参数就是控制inflation机制的阈值，当同一个Method的invoke被调用次数未超过阈值时是JNI调用，超过阈值时生成GMA类优化反射调用。inflationThreshold默认值为15（可通过-Dsun.reflect.inflationThreshold进行设置参考图x.x），该值越小越容易触发GMA类的生成，相反设置得越大就越不容易触发GMA类生成。
+这个方法是`NativeMethodAccessorImpl`实现反射调用的相关代码，`inflationThreshold`参数就是控制`inflation`机制的阈值，当同一个Method的invoke被调用次数未超过阈值时是JNI调用，超过阈值时生成GMA类优化反射调用。`inflationThreshold`默认值为15（可通过`-Dsun.reflect.inflationThreshold`进行设置参考图x.x），该值越小越容易触发GMA类的生成，相反设置得越大就越不容易触发GMA类生成。
 ![image](/img/20231222-20.jpg)
 <center style="color:gray">图20</center>
 
-通过上面的分析，已经搞清楚了反射的inflation机制，知道了GMA类生成的时机，但是为什么虚拟机不设计成始终使用JNI来执行反射调用呢？设计这么复杂的GMA类和inflation机制是什么原因？
+通过上面的分析，已经搞清楚了反射的`inflation`机制，知道了GMA类生成的时机，但是为什么虚拟机不设计成始终使用JNI来执行反射调用呢？设计这么复杂的GMA类和`inflation`机制是什么原因？
 
 为什么反射需要字节码和native两种方式以及inflation的好处
 
 先来说一下为什么需要字节码和native两种实现方式，native调用和字节码调用的区别包括
 
 1.Java 字节码调用效率比 native 调用要快 20 倍以上
+
 2.Java 字节码加载时要比 native 多消耗 3~4 倍资源
+
 3.Java字节码在初始化时需要较多时间和较多资源，但持续运行因为热点代码优化会比native更快，使用Java字节码可以避免JNI为了维护OopMap进行封装/解封装而带来的性能损耗
+
 4.native版本正好相反，启动时直接JNI调用较快，但持续运行因为跨越native边界会导致JIT优化不到，长期看性能不如Java字节码
 
-因为字节码和native在性能和开销上的差异，所以虚拟机设计了inflation机制，这个机制跟HotSpot命名有点异曲同工之妙。我们都知道虚拟机通过解释器（Interpreter）来执行字节码文件，且虚拟机内有计数器来统计代码的调用次数，当虚拟机发现某个方法或代码块的运行特别频繁时，就会把这些代码认定为“热点代码”（Hot Spot Code），这也就是HotSpot虚拟机的命名来源。热点代码会通过JIT编译生成机器码，比解释器逐条执行的效率会高很多。至于为什么HotSpot不使用JIT全程编译，也是在性能和开销上取的折中，想详细了解的可以参考下为什么 JVM 不用 JIT 全程编译？-- R大。
+因为字节码和native在性能和开销上的差异，所以虚拟机设计了`inflation`机制，这个机制跟HotSpot命名有点异曲同工之妙。我们都知道虚拟机通过解释器（`Interpreter`）来执行字节码文件，且虚拟机内有计数器来统计代码的调用次数，当虚拟机发现某个方法或代码块的运行特别频繁时，就会把这些代码认定为“热点代码”（`Hot Spot Code`），这也就是HotSpot虚拟机的命名来源。热点代码会通过JIT编译生成机器码，比解释器逐条执行的效率会高很多。至于为什么HotSpot不使用JIT全程编译，也是在性能和开销上取的折中，想详细了解的可以参考下为什么 JVM 不用 JIT 全程编译？-- R大。
 ![image](/img/20231222-21.jpg)
 <center style="color:gray">图21 HotSpot简介图</center>
 
